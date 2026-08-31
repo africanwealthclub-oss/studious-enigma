@@ -31,8 +31,7 @@ export type Testimonial = {
   published_at?: string | null;
 };
 
-
-const baseUrl = (import.meta.env.VITE_API_BASE_URL || "https://api.kimahtherealtor.com/api").replace(/\/$/, "");
+const baseUrl = "https://api.kimahtherealtor.com/api";
 let csrfToken = "";
 
 export function setCsrfToken(token?: string | null) {
