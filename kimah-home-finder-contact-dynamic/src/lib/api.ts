@@ -1,5 +1,6 @@
 export type AdminUser = { id: number; email: string; role: "owner" | "editor" };
 
+
 export type Listing = {
   id: number;
   slug: string;
@@ -16,8 +17,14 @@ export type Listing = {
   description?: string | null;
   is_featured?: number;
   published_at?: string | null;
+  published?: boolean; // write-only: sent on create/update to set published_at server-side
   image_url?: string | null;
 };
+
+
+
+
+
 
 export type ListingImage = {
   id: number;
