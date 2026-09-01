@@ -19,6 +19,13 @@ export type Listing = {
   image_url?: string | null;
 };
 
+export type ListingImage = {
+  id: number;
+  listing_id: number;
+  image_url: string;
+  sort_order: number;
+};
+
 export type Testimonial = {
   id: number;
   client_name: string;
@@ -47,6 +54,23 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}): Pr
       ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
       ...(options.headers || {}),
     },
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || `Request failed (${response.status})`);
+  return payload as T;
+}
+
+// Separate from apiRequest because file uploads use multipart/form-data —
+// setting a Content-Type header manually would break the browser's own
+// multipart boundary, so this deliberately omits it.
+async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
+  const response = await fetch(`${baseUrl}${path}`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
+    },
+    body: formData,
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload.error || `Request failed (${response.status})`);
@@ -87,6 +111,27 @@ export async function updateListing(id: number, input: Partial<Listing> & { publ
 
 export async function deleteListing(id: number) {
   return apiRequest<{ ok: boolean }>(`/admin/listings/${id}`, { method: "DELETE" });
+}
+
+export async function getListingImages(listingId: number) {
+  return apiRequest<{ data: ListingImage[] }>(`/admin/listings/${listingId}/images`);
+}
+
+export async function uploadListingImage(listingId: number, file: File) {
+  const formData = new FormData();
+  formData.append("image", file);
+  return apiUpload<ListingImage>(`/admin/listings/${listingId}/images`, formData);
+}
+
+export async function deleteListingImage(imageId: number) {
+  return apiRequest<{ ok: boolean }>(`/admin/listings/images/${imageId}`, { method: "DELETE" });
+}
+
+export async function reorderListingImages(listingId: number, order: number[]) {
+  return apiRequest<{ ok: boolean }>(`/admin/listings/${listingId}/images/reorder`, {
+    method: "PATCH",
+    body: JSON.stringify({ order }),
+  });
 }
 
 export async function getAdminTestimonials() {
