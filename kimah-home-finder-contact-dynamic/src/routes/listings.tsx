@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
   Bath,
@@ -39,8 +39,15 @@ export const Route = createFileRoute("/listings")({
     ],
     links: [{ rel: "canonical", href: "/listings" }],
   }),
-  component: Listings,
+  component: ListingsLayout,
 });
+
+function ListingsLayout() {
+  const location = useLocation();
+  const isDetailRoute = location.pathname !== "/listings" && location.pathname.startsWith("/listings/");
+
+  return isDetailRoute ? <Outlet /> : <Listings />;
+}
 
 function displayStatus(status: string) {
   return status
