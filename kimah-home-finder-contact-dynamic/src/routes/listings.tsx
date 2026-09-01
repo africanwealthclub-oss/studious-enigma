@@ -169,7 +169,7 @@ function Listings() {
               <p className="mt-4 font-display text-2xl">
                 {l.price_label ||
                   (l.price
-                    ? `$${Number(l.price).toLocaleString()}`
+                    ? Number(l.price).toLocaleString()
                     : "Price on request")}
               </p>
 
