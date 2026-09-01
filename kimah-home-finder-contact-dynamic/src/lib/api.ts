@@ -24,8 +24,12 @@ export type ListingImage = {
   id: number;
   listing_id: number;
   image_url: string;
+  alt_text?: string | null;
   sort_order: number;
 };
+
+// Full listing record as returned by /public/listings/:slug — includes every image, not just the cover.
+export type ListingDetail = Listing & { images: ListingImage[] };
 
 export type Testimonial = {
   id: number;
@@ -95,6 +99,26 @@ export async function logout() {
   setCsrfToken("");
 }
 
+export async function changeAdminPassword(currentPassword: string, newPassword: string) {
+  return apiRequest<{ ok: boolean }>("/admin/account/password", {
+    method: "PATCH",
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+  });
+}
+
+// ---------- Public listings ----------
+
+export async function getPublicListings() {
+  return apiRequest<{ data: Listing[] }>("/public/listings");
+}
+
+// Full detail record for a single listing, including every gallery image (not just the cover).
+export async function getPublicListing(slug: string) {
+  return apiRequest<{ data: ListingDetail }>(`/public/listings/${encodeURIComponent(slug)}`);
+}
+
+// ---------- Admin listings ----------
+
 export async function getAdminListings() {
   return apiRequest<{ data: Listing[] }>("/admin/listings");
 }
@@ -146,7 +170,17 @@ export async function getPublicSettings() {
   return apiRequest<{ data: Record<string, unknown> }>("/public/settings");
 }
 
-export type Inquiry = { id: number; name: string; email: string; phone?: string | null; interest: string; message: string; status: "new" | "contacted" | "closed" | "spam"; admin_notes?: string | null; created_at: string };
+export type Inquiry = {
+  id: number;
+  name: string;
+  email: string;
+  phone?: string | null;
+  interest: string;
+  message: string;
+  status: "new" | "contacted" | "closed" | "spam";
+  admin_notes?: string | null;
+  created_at: string;
+};
 
 export async function getAdminInquiries() {
   return apiRequest<{ data: Inquiry[] }>("/admin/inquiries");
