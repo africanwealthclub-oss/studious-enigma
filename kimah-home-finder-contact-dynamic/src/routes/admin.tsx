@@ -349,22 +349,120 @@ function slugify(value: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+const emptyListingForm: Partial<Listing> = { status: "draft", state: "TX" };
+
 function Listings({ onError, onMessage }: { onError: (s: string) => void; onMessage: (s: string) => void }) {
   const [items, setItems] = useState<Listing[]>([]);
-  const [form, setForm] = useState<Partial<Listing>>({ status: "draft", state: "TX" });
-  const [editing, setEditing] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
-  const [slugTouched, setSlugTouched] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<number | null>(null);
 
   async function load() { try { setItems((await getAdminListings()).data); } catch (e) { onError(e instanceof Error ? e.message : "Unable to load listings"); } finally { setLoading(false); } }
   useEffect(() => { load(); }, []);
 
+  async function remove(id: number, e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!confirm("Delete this listing?")) return;
+    try { await deleteListing(id); onMessage("Listing deleted."); await load(); }
+    catch (err) { onError(err instanceof Error ? err.message : "Unable to delete listing"); }
+  }
+
+  function openNew() { setEditing(null); setModalOpen(true); }
+  function openEdit(item: Listing) { setEditing(item.id); setModalOpen(true); }
+  function closeModal() { setModalOpen(false); setEditing(null); }
+  async function afterSave() { await load(); }
+
+  const statusStyles: Record<string, string> = {
+    draft: "bg-secondary text-muted-foreground",
+    for_sale: "bg-gold/15 text-gold",
+    for_lease: "bg-primary/10 text-primary",
+    investment: "bg-green-100 text-green-800",
+  };
+
+  return (
+    <section>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <p className="max-w-xl text-sm text-muted-foreground">Add homes for sale, lease, or investment, and manage their photos.</p>
+        <button onClick={openNew} className="flex items-center gap-2 bg-primary px-5 py-3 text-xs uppercase tracking-[0.2em] text-primary-foreground">
+          <Icon path={icons.plus} className="h-4 w-4" /> New listing
+        </button>
+      </div>
+
+      {loading ? (
+        <p className="mt-8 text-sm text-muted-foreground">Loading…</p>
+      ) : items.length === 0 ? (
+        <div className="mt-8 border border-dashed border-border bg-background p-12 text-center">
+          <p className="text-sm text-muted-foreground">No listings yet.</p>
+          <button onClick={openNew} className="mt-4 bg-gold px-5 py-2.5 text-xs uppercase tracking-[0.2em]">Create your first listing</button>
+        </div>
+      ) : (
+        <div className="mt-8 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+          {items.map((item) => (
+            <article
+              key={item.id}
+              onClick={() => openEdit(item)}
+              className="group cursor-pointer border border-border bg-background transition-colors hover:border-gold"
+            >
+              <div className="relative aspect-[4/3] bg-secondary/40">
+                {item.image_url ? (
+                  <img src={item.image_url} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-xs uppercase tracking-[0.15em] text-muted-foreground">No photo</div>
+                )}
+                <span className={`absolute left-3 top-3 px-2 py-1 text-[10px] uppercase tracking-[0.1em] ${statusStyles[item.status] || "bg-secondary text-muted-foreground"}`}>
+                  {item.status.replaceAll("_", " ")}
+                </span>
+                {!!item.is_featured && (
+                  <span className="absolute right-3 top-3 bg-black/70 px-2 py-1 text-[10px] uppercase tracking-[0.1em] text-white">Featured</span>
+                )}
+              </div>
+              <div className="p-5">
+                <h3 className="text-lg leading-snug">{item.title}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">{item.city}, {item.state}</p>
+                <p className="mt-3 text-sm">{item.price_label || "Price on request"}</p>
+                <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
+                  <span className="text-xs uppercase tracking-[0.15em] text-gold opacity-0 transition-opacity group-hover:opacity-100">Edit →</span>
+                  <button onClick={(e) => remove(item.id, e)} className="text-xs uppercase tracking-[0.15em] text-red-700">Delete</button>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+
+      {modalOpen && (
+        <ListingModal
+          listingId={editing}
+          initial={editing ? items.find((i) => i.id === editing) ?? null : null}
+          onClose={closeModal}
+          onSaved={afterSave}
+          onError={onError}
+          onMessage={onMessage}
+        />
+      )}
+    </section>
+  );
+}
+
+function ListingModal({
+  listingId, initial, onClose, onSaved, onError, onMessage,
+}: {
+  listingId: number | null;
+  initial: Listing | null;
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+  onError: (s: string) => void;
+  onMessage: (s: string) => void;
+}) {
+  const [form, setForm] = useState<Partial<Listing>>(initial || emptyListingForm);
+  const [currentId, setCurrentId] = useState<number | null>(listingId);
+  const [slugTouched, setSlugTouched] = useState(!!listingId);
+  const [saving, setSaving] = useState(false);
+
   function change(key: string, value: string) {
     setForm((old) => {
       const next: Record<string, unknown> = { ...old, [key]: value };
-      // Keep the slug in sync with the title until the user edits it directly,
-      // and never touch it once editing an existing listing (slug is locked then).
-      if (key === "title" && !editing && !slugTouched) {
+      if (key === "title" && !currentId && !slugTouched) {
         next.slug = slugify(value);
       }
       return next as Partial<Listing>;
@@ -374,126 +472,110 @@ function Listings({ onError, onMessage }: { onError: (s: string) => void; onMess
 
   async function save(e: FormEvent) {
     e.preventDefault();
+    setSaving(true);
     try {
-      if (editing) { await updateListing(editing, form); onMessage("Listing updated."); }
-      else {
+      if (currentId) {
+        await updateListing(currentId, form);
+        onMessage("Listing updated.");
+        await onSaved();
+      } else {
         const created = await createListing(form);
         onMessage("Listing created. Add photos below.");
-        setEditing((created as { id: number }).id);
-        await load();
-        return;
+        setCurrentId((created as { id: number }).id);
+        await onSaved();
       }
-      await load();
     } catch (err) { onError(err instanceof Error ? err.message : "Unable to save listing"); }
+    finally { setSaving(false); }
   }
 
-  async function remove(id: number) {
-    if (!confirm("Delete this listing?")) return;
-    try { await deleteListing(id); onMessage("Listing deleted."); if (editing === id) { setEditing(null); setForm({ status: "draft", state: "TX" }); } await load(); }
-    catch (e) { onError(e instanceof Error ? e.message : "Unable to delete listing"); }
+  function handleOverlayClick(e: React.MouseEvent) {
+    if (e.target === e.currentTarget) onClose();
   }
-
-  function startNew() { setEditing(null); setForm({ status: "draft", state: "TX" }); setSlugTouched(false); }
-  function startEdit(item: Listing) { setEditing(item.id); setForm(item); setSlugTouched(true); }
 
   return (
-    <section>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <p className="max-w-xl text-sm text-muted-foreground">Add homes for sale, lease, or investment, and manage their photos.</p>
-        <button onClick={startNew} className="flex items-center gap-2 bg-primary px-5 py-3 text-xs uppercase tracking-[0.2em] text-primary-foreground">
-          <Icon path={icons.plus} className="h-4 w-4" /> New listing
-        </button>
-      </div>
-
-      <form onSubmit={save} className="mt-8 grid gap-4 border border-border bg-background p-6 md:grid-cols-2">
-        <label className="text-xs uppercase tracking-[0.15em]">Title
-          <input className={`${inputClass} mt-2`} value={form.title || ""} onChange={(e) => change("title", e.target.value)} required />
-        </label>
-        <label className="text-xs uppercase tracking-[0.15em]">Slug
-          <input
-            className={`${inputClass} mt-2 ${editing ? "text-muted-foreground" : ""}`}
-            value={form.slug || ""}
-            onChange={(e) => change("slug", slugify(e.target.value))}
-            placeholder="generated from title"
-            required
-            disabled={!!editing}
-          />
-          <span className="mt-1 block text-[11px] normal-case tracking-normal text-muted-foreground">
-            {editing ? "Locked after creation." : "Auto-filled from the title — edit if you want a different URL."}
-          </span>
-        </label>
-        <label className="text-xs uppercase tracking-[0.15em]">City
-          <input className={`${inputClass} mt-2`} value={form.city || ""} onChange={(e) => change("city", e.target.value)} required />
-        </label>
-        <label className="text-xs uppercase tracking-[0.15em]">Address
-          <input className={`${inputClass} mt-2`} value={form.address || ""} onChange={(e) => change("address", e.target.value)} />
-        </label>
-        <label className="text-xs uppercase tracking-[0.15em]">Status
-          <select className={`${inputClass} mt-2`} value={form.status || "draft"} onChange={(e) => change("status", e.target.value)}>
-            <option value="draft">Draft</option>
-            <option value="for_sale">For sale</option>
-            <option value="for_lease">For lease</option>
-            <option value="investment">Investment</option>
-          </select>
-        </label>
-        <label className="text-xs uppercase tracking-[0.15em]">Price label
-          <input className={`${inputClass} mt-2`} placeholder="$450,000" value={form.price_label || ""} onChange={(e) => change("price_label", e.target.value)} />
-        </label>
-        <label className="text-xs uppercase tracking-[0.15em]">Price (numeric)
-          <input type="number" min="0" step="1000" className={`${inputClass} mt-2`} placeholder="450000" value={form.price ?? ""} onChange={(e) => change("price", e.target.value)} />
-          <span className="mt-1 block text-[11px] normal-case tracking-normal text-muted-foreground">Used for sorting/filtering. The price label above is what visitors see.</span>
-        </label>
-        <label className="text-xs uppercase tracking-[0.15em]">Bedrooms
-          <input type="number" min="0" step="1" className={`${inputClass} mt-2`} value={form.bedrooms ?? ""} onChange={(e) => change("bedrooms", e.target.value)} />
-        </label>
-        <label className="text-xs uppercase tracking-[0.15em]">Bathrooms
-          <input type="number" min="0" step="0.5" className={`${inputClass} mt-2`} value={form.bathrooms ?? ""} onChange={(e) => change("bathrooms", e.target.value)} />
-        </label>
-        <label className="text-xs uppercase tracking-[0.15em]">Square feet
-          <input type="number" min="0" step="1" className={`${inputClass} mt-2`} value={form.square_feet ?? ""} onChange={(e) => change("square_feet", e.target.value)} />
-        </label>
-        <label className="flex items-center gap-2 text-xs uppercase tracking-[0.15em]">
-          <input type="checkbox" checked={!!form.is_featured} onChange={(e) => setForm((old) => ({ ...old, is_featured: e.target.checked ? 1 : 0 }))} />
-          Featured listing
-        </label>
-        <label className="text-xs uppercase tracking-[0.15em] md:col-span-2">Description
-          <textarea className={`${inputClass} mt-2 min-h-24`} value={form.description || ""} onChange={(e) => change("description", e.target.value)} />
-        </label>
-        <div className="md:col-span-2">
-          <button className="bg-gold px-5 py-3 text-xs uppercase tracking-[0.2em]">{editing ? "Update listing" : "Create listing"}</button>
-          {editing && <button type="button" onClick={startNew} className="ml-3 border border-border px-5 py-3 text-xs uppercase tracking-[0.2em]">Cancel</button>}
+    <div onClick={handleOverlayClick} className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 px-4 py-8 sm:items-center">
+      <div className="w-full max-w-2xl border border-border bg-background">
+        <div className="flex items-center justify-between border-b border-border px-6 py-5">
+          <h2 className="text-xl">{currentId ? "Edit listing" : "New listing"}</h2>
+          <button onClick={onClose} aria-label="Close" className="text-2xl leading-none text-muted-foreground hover:text-gold">×</button>
         </div>
-      </form>
 
-      {editing && (
-        <div className="mt-6">
-          <ImageManager listingId={editing} onError={onError} />
+        <div className="max-h-[75vh] overflow-y-auto px-6 py-6">
+          <form onSubmit={save} className="grid gap-4 md:grid-cols-2">
+            <label className="text-xs uppercase tracking-[0.15em]">Title
+              <input className={`${inputClass} mt-2`} value={form.title || ""} onChange={(e) => change("title", e.target.value)} required />
+            </label>
+            <label className="text-xs uppercase tracking-[0.15em]">Slug
+              <input
+                className={`${inputClass} mt-2 ${currentId ? "text-muted-foreground" : ""}`}
+                value={form.slug || ""}
+                onChange={(e) => change("slug", slugify(e.target.value))}
+                placeholder="generated from title"
+                required
+                disabled={!!currentId}
+              />
+              <span className="mt-1 block text-[11px] normal-case tracking-normal text-muted-foreground">
+                {currentId ? "Locked after creation." : "Auto-filled from the title — edit if you want a different URL."}
+              </span>
+            </label>
+            <label className="text-xs uppercase tracking-[0.15em]">City
+              <input className={`${inputClass} mt-2`} value={form.city || ""} onChange={(e) => change("city", e.target.value)} required />
+            </label>
+            <label className="text-xs uppercase tracking-[0.15em]">Address
+              <input className={`${inputClass} mt-2`} value={form.address || ""} onChange={(e) => change("address", e.target.value)} />
+            </label>
+            <label className="text-xs uppercase tracking-[0.15em]">Status
+              <select className={`${inputClass} mt-2`} value={form.status || "draft"} onChange={(e) => change("status", e.target.value)}>
+                <option value="draft">Draft</option>
+                <option value="for_sale">For sale</option>
+                <option value="for_lease">For lease</option>
+                <option value="investment">Investment</option>
+              </select>
+            </label>
+            <label className="text-xs uppercase tracking-[0.15em]">Price label
+              <input className={`${inputClass} mt-2`} placeholder="$450,000" value={form.price_label || ""} onChange={(e) => change("price_label", e.target.value)} />
+            </label>
+            <label className="text-xs uppercase tracking-[0.15em]">Price (numeric)
+              <input type="number" min="0" step="1000" className={`${inputClass} mt-2`} placeholder="450000" value={form.price ?? ""} onChange={(e) => change("price", e.target.value)} />
+              <span className="mt-1 block text-[11px] normal-case tracking-normal text-muted-foreground">Used for sorting/filtering. The price label above is what visitors see.</span>
+            </label>
+            <label className="text-xs uppercase tracking-[0.15em]">Bedrooms
+              <input type="number" min="0" step="1" className={`${inputClass} mt-2`} value={form.bedrooms ?? ""} onChange={(e) => change("bedrooms", e.target.value)} />
+            </label>
+            <label className="text-xs uppercase tracking-[0.15em]">Bathrooms
+              <input type="number" min="0" step="0.5" className={`${inputClass} mt-2`} value={form.bathrooms ?? ""} onChange={(e) => change("bathrooms", e.target.value)} />
+            </label>
+            <label className="text-xs uppercase tracking-[0.15em]">Square feet
+              <input type="number" min="0" step="1" className={`${inputClass} mt-2`} value={form.square_feet ?? ""} onChange={(e) => change("square_feet", e.target.value)} />
+            </label>
+            <label className="flex items-center gap-2 text-xs uppercase tracking-[0.15em]">
+              <input type="checkbox" checked={!!form.is_featured} onChange={(e) => setForm((old) => ({ ...old, is_featured: e.target.checked ? 1 : 0 }))} />
+              Featured listing
+            </label>
+            <label className="text-xs uppercase tracking-[0.15em] md:col-span-2">Description
+              <textarea className={`${inputClass} mt-2 min-h-24`} value={form.description || ""} onChange={(e) => change("description", e.target.value)} />
+            </label>
+            <div className="md:col-span-2">
+              <button disabled={saving} className="bg-gold px-5 py-3 text-xs uppercase tracking-[0.2em] disabled:opacity-50">
+                {saving ? "Saving…" : currentId ? "Update listing" : "Create listing"}
+              </button>
+            </div>
+          </form>
+
+          {currentId && (
+            <div className="mt-6">
+              <ImageManager listingId={currentId} onError={onError} />
+            </div>
+          )}
         </div>
-      )}
 
-      <div className="mt-8 overflow-x-auto border border-border bg-background">
-        {loading ? <p className="p-6 text-sm text-muted-foreground">Loading…</p> : (
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-border text-xs uppercase tracking-[0.15em] text-muted-foreground">
-              <tr><th className="p-4">Property</th><th className="p-4">Location</th><th className="p-4">Status</th><th className="p-4">Actions</th></tr>
-            </thead>
-            <tbody>
-              {items.map((item) => (
-                <tr key={item.id} className="border-b border-border last:border-0">
-                  <td className="p-4">{item.title}<span className="block text-xs text-muted-foreground">{item.price_label || "Price on request"}</span></td>
-                  <td className="p-4">{item.city}, {item.state}</td>
-                  <td className="p-4 capitalize">{item.status.replaceAll("_", " ")}</td>
-                  <td className="p-4">
-                    <button onClick={() => startEdit(item)} className="mr-3 text-gold">Edit</button>
-                    <button onClick={() => remove(item.id)} className="text-red-700">Delete</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <div className="flex justify-end border-t border-border px-6 py-4">
+          <button onClick={onClose} className="border border-border px-5 py-2.5 text-xs uppercase tracking-[0.2em]">
+            {currentId ? "Done" : "Close"}
+          </button>
+        </div>
       </div>
-    </section>
+    </div>
   );
 }
 
