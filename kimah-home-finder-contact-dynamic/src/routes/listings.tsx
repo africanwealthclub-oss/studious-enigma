@@ -39,7 +39,7 @@ export const Route = createFileRoute("/listings")({
       },
       { property: "og:type", content: "website" },
       { property: "og:url", content: "/listings" },
-      ],
+    ],
     links: [{ rel: "canonical", href: "/listings" }],
   }),
   component: Listings,
@@ -248,15 +248,15 @@ function Listings() {
             - built around your timeline.
           </p>
 
-          <ul className="mt-7 space-y-3 text-sm text-muted-foreground">
+          <ul className="mt-7 space-y-4 text-sm text-muted-foreground">
             {[
               "Comparative market analysis within 24 hours",
               "Prep & staging checklist to maximize your sale price",
               "Professional marketing across portals and social",
             ].map((v) => (
               <li key={v} className="flex items-start gap-3">
-                <span className="mt-2 h-px w-5 shrink-0 bg-gold" />
-                {v}
+                <ArrowRight className="mt-0.5 size-4 shrink-0 text-gold" />
+                <span>{v}</span>
               </li>
             ))}
           </ul>
