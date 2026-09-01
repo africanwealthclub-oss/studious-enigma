@@ -18,7 +18,7 @@ export function SiteHeader() {
     <header className="sticky top-0 z-50 border-b border-border/70 bg-background/90 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <Link to="/" className="flex items-center gap-3" onClick={() => setOpen(false)}>
-          <img src={logo} alt="Kimah The Realtor logo" className="h-12 w-12 object-contain" />
+          <img src={logo} alt="Kimah The Realtor logo" className="h-36 w-24 object-contain" />
           <span className="hidden sm:block">
             <span className="block font-display text-xl tracking-[0.3em]">KIMAH</span>
             <span className="block text-[0.6rem] tracking-[0.35em] text-muted-foreground">
