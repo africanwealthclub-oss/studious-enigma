@@ -1,6 +1,5 @@
 export type AdminUser = { id: number; email: string; role: "owner" | "editor" };
 
-
 export type Listing = {
   id: number;
   slug: string;
@@ -17,14 +16,9 @@ export type Listing = {
   description?: string | null;
   is_featured?: number;
   published_at?: string | null;
-  published?: boolean; // write-only: sent on create/update to set published_at server-side
+  published?: boolean;
   image_url?: string | null;
 };
-
-
-
-
-
 
 export type ListingImage = {
   id: number;
@@ -67,9 +61,6 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}): Pr
   return payload as T;
 }
 
-// Separate from apiRequest because file uploads use multipart/form-data —
-// setting a Content-Type header manually would break the browser's own
-// multipart boundary, so this deliberately omits it.
 async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
   const response = await fetch(`${baseUrl}${path}`, {
     method: "POST",
@@ -163,6 +154,11 @@ export async function getAdminInquiries() {
 
 export async function updateInquiry(id: number, input: { status: Inquiry["status"]; admin_notes?: string }) {
   return apiRequest<{ ok: boolean }>(`/admin/inquiries/${id}`, { method: "PATCH", body: JSON.stringify(input) });
+}
+
+// Public contact-form / listing-inquiry submission
+export async function submitInquiry(input: { name: string; email: string; phone?: string; interest: string; message: string }) {
+  return apiRequest<{ message: string }>("/public/inquiries", { method: "POST", body: JSON.stringify(input) });
 }
 
 export async function getAdminPage(pageKey: string) {
