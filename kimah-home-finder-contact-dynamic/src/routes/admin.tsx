@@ -361,13 +361,13 @@ function Listings({ onError, onMessage }: { onError: (s: string) => void; onMess
 
   function change(key: string, value: string) {
     setForm((old) => {
-      const next = { ...old, [key]: value };
+      const next: Record<string, unknown> = { ...old, [key]: value };
       // Keep the slug in sync with the title until the user edits it directly,
       // and never touch it once editing an existing listing (slug is locked then).
       if (key === "title" && !editing && !slugTouched) {
         next.slug = slugify(value);
       }
-      return next;
+      return next as Partial<Listing>;
     });
     if (key === "slug") setSlugTouched(true);
   }
@@ -438,6 +438,23 @@ function Listings({ onError, onMessage }: { onError: (s: string) => void; onMess
         </label>
         <label className="text-xs uppercase tracking-[0.15em]">Price label
           <input className={`${inputClass} mt-2`} placeholder="$450,000" value={form.price_label || ""} onChange={(e) => change("price_label", e.target.value)} />
+        </label>
+        <label className="text-xs uppercase tracking-[0.15em]">Price (numeric)
+          <input type="number" min="0" step="1000" className={`${inputClass} mt-2`} placeholder="450000" value={form.price ?? ""} onChange={(e) => change("price", e.target.value)} />
+          <span className="mt-1 block text-[11px] normal-case tracking-normal text-muted-foreground">Used for sorting/filtering. The price label above is what visitors see.</span>
+        </label>
+        <label className="text-xs uppercase tracking-[0.15em]">Bedrooms
+          <input type="number" min="0" step="1" className={`${inputClass} mt-2`} value={form.bedrooms ?? ""} onChange={(e) => change("bedrooms", e.target.value)} />
+        </label>
+        <label className="text-xs uppercase tracking-[0.15em]">Bathrooms
+          <input type="number" min="0" step="0.5" className={`${inputClass} mt-2`} value={form.bathrooms ?? ""} onChange={(e) => change("bathrooms", e.target.value)} />
+        </label>
+        <label className="text-xs uppercase tracking-[0.15em]">Square feet
+          <input type="number" min="0" step="1" className={`${inputClass} mt-2`} value={form.square_feet ?? ""} onChange={(e) => change("square_feet", e.target.value)} />
+        </label>
+        <label className="flex items-center gap-2 text-xs uppercase tracking-[0.15em]">
+          <input type="checkbox" checked={!!form.is_featured} onChange={(e) => setForm((old) => ({ ...old, is_featured: e.target.checked ? 1 : 0 }))} />
+          Featured listing
         </label>
         <label className="text-xs uppercase tracking-[0.15em] md:col-span-2">Description
           <textarea className={`${inputClass} mt-2 min-h-24`} value={form.description || ""} onChange={(e) => change("description", e.target.value)} />
