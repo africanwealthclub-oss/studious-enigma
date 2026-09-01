@@ -193,7 +193,7 @@ function Contact() {
               [
                 "01",
                 "I reply personally",
-                "Expect a call, text, or email back — usually the same day — to talk through your goals.",
+                "Expect a call, text, or email back  usually the same day  to talk through your goals.",
               ],
               [
                 "02",
@@ -203,7 +203,7 @@ function Contact() {
               [
                 "03",
                 "We make your move",
-                "Tours, offers, negotiation, and closing — with proactive updates at every step.",
+                "Tours, offers, negotiation, and closing  with proactive updates at every step.",
               ],
             ].map(([step, title, body]) => (
               <div key={step} className="bg-ink p-8">
@@ -225,11 +225,11 @@ function Contact() {
           {[
             [
               "Which areas do you serve?",
-              "The entire Dallas–Fort Worth metroplex and surrounding communities — Dallas, Fort Worth, Arlington, Plano, Frisco, McKinney, and beyond.",
+              "The entire Dallas–Fort Worth metroplex and surrounding communities  Dallas, Fort Worth, Arlington, Plano, Frisco, McKinney, and beyond.",
             ],
             [
               "Do you work with first-time buyers?",
-              "Absolutely. First-time buyers are some of my favorite clients — I’ll walk you through every step in plain English, from pre-approval to keys.",
+              "Absolutely. First-time buyers are some of my favorite clients  I’ll walk you through every step in plain English, from pre-approval to keys.",
             ],
             [
               "Can you help me lease a home or find tenants?",
@@ -237,7 +237,7 @@ function Contact() {
             ],
             [
               "What does it cost to work with you?",
-              "It depends on the transaction. Reach out and I’ll explain exactly how compensation works for your situation — no surprises.",
+              "It depends on the transaction. Reach out and I’ll explain exactly how compensation works for your situation  no surprises.",
             ],
           ].map(([q, a]) => (
             <details key={q} className="group py-6">
