@@ -4,9 +4,6 @@ import {
   createListing,
   deleteListing,
   getAdminListings,
-  getAdminTestimonials,
-  getAdminPage,
-  saveAdminPage,
   getAdminInquiries,
   updateInquiry,
   type Inquiry,
@@ -14,10 +11,8 @@ import {
   login,
   logout,
   updateListing,
-  updateTestimonial,
   type AdminUser,
   type Listing,
-  type Testimonial,
   getListingImages,
   uploadListingImage,
   deleteListingImage,
@@ -27,11 +22,10 @@ import {
 
 export const Route = createFileRoute("/admin")({ component: AdminDashboard });
 
-type Tab = "overview" | "listings" | "testimonials" | "pages" | "inquiries";
+type Tab = "overview" | "listings" | "inquiries";
 
 const inputClass = "w-full border border-input bg-background px-3 py-2 text-sm outline-none focus:border-gold";
 
-/* ---------- Icons (inline, no dependency) ---------- */
 function Icon({ path, className = "h-5 w-5" }: { path: string; className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -42,15 +36,41 @@ function Icon({ path, className = "h-5 w-5" }: { path: string; className?: strin
 const icons = {
   overview: "M4 13h6V4H4v9Zm0 7h6v-5H4v5Zm10 0h6V11h-6v9Zm0-16v5h6V4h-6Z",
   listings: "M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1V9.5Z",
-  testimonials: "M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10Z",
-  pages: "M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm9 0v5h5M8 13h8M8 17h5",
   inquiries: "M4 4h16v12H7l-3 3V4Z",
   signOut: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9",
   view: "M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z",
   upload: "M12 16V4M7 9l5-5 5 5M4 20h16",
   trash: "M4 7h16M9 7V4h6v3M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13",
   plus: "M12 5v14M5 12h14",
+  menu: "M4 6h16M4 12h16M4 18h16",
+  close: "M6 6l12 12M18 6L6 18",
 };
+
+type NavItem = { key: Tab; label: string; icon: string; count?: number };
+
+function NavList({ navItems, tab, onSelect }: { navItems: NavItem[]; tab: Tab; onSelect: (t: Tab) => void }) {
+  return (
+    <nav className="flex-1 space-y-1 px-3 py-4">
+      {navItems.map((item) => (
+        <button
+          key={item.key}
+          onClick={() => onSelect(item.key)}
+          className={`flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors ${
+            tab === item.key ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"
+          }`}
+        >
+          <Icon path={item.icon} className="h-[18px] w-[18px] shrink-0" />
+          <span className="flex-1">{item.label}</span>
+          {item.count ? (
+            <span className={`px-1.5 py-0.5 text-[11px] leading-none ${tab === item.key ? "bg-primary-foreground/20" : "bg-gold/20 text-gold"}`}>
+              {item.count}
+            </span>
+          ) : null}
+        </button>
+      ))}
+    </nav>
+  );
+}
 
 function AdminDashboard() {
   const [user, setUser] = useState<AdminUser | null>(null);
@@ -58,9 +78,9 @@ function AdminDashboard() {
   const [tab, setTab] = useState<Tab>("overview");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [navOpen, setNavOpen] = useState(false);
 
   const [listings, setListings] = useState<Listing[]>([]);
-  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
 
   useEffect(() => {
@@ -70,14 +90,13 @@ function AdminDashboard() {
   useEffect(() => {
     if (!user) return;
     getAdminListings().then((r) => setListings(r.data)).catch(() => undefined);
-    getAdminTestimonials().then((r) => setTestimonials(r.data)).catch(() => undefined);
     getAdminInquiries().then((r) => setInquiries(r.data)).catch(() => undefined);
   }, [user, tab]);
 
   if (checking) {
     return (
       <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
-        Loading admin…
+        Loading admin...
       </div>
     );
   }
@@ -88,41 +107,64 @@ function AdminDashboard() {
     setUser(null);
   }
 
-  const navItems: { key: Tab; label: string; icon: string; count?: number }[] = [
+  function selectTab(t: Tab) {
+    setTab(t);
+    setError("");
+    setMessage("");
+    setNavOpen(false);
+  }
+
+  const navItems: NavItem[] = [
     { key: "overview", label: "Overview", icon: icons.overview },
     { key: "listings", label: "Listings", icon: icons.listings, count: listings.length },
-    { key: "testimonials", label: "Testimonials", icon: icons.testimonials, count: testimonials.filter((t) => t.status === "pending").length || undefined },
-    { key: "pages", label: "Pages", icon: icons.pages },
     { key: "inquiries", label: "Inquiries", icon: icons.inquiries, count: inquiries.filter((i) => i.status === "new").length || undefined },
   ];
 
   return (
     <div className="flex min-h-screen bg-secondary/20">
-      {/* Sidebar */}
-      <aside className="flex w-64 shrink-0 flex-col border-r border-border bg-background">
+      {/* Mobile top bar */}
+      <div className="fixed inset-x-0 top-0 z-40 flex items-center justify-between border-b border-border bg-background px-4 py-3 md:hidden">
+        <button onClick={() => setNavOpen(true)} aria-label="Open menu" className="p-2 -ml-2">
+          <Icon path={icons.menu} className="h-5 w-5" />
+        </button>
+        <span className="text-sm capitalize">{tab}</span>
+        <span className="w-9" />
+      </div>
+
+      {/* Mobile drawer */}
+      {navOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setNavOpen(false)} />
+          <aside className="relative z-10 flex h-full w-72 max-w-[85vw] flex-col bg-background">
+            <div className="flex items-center justify-between border-b border-border px-6 py-6">
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Kimah The Realtor</p>
+                <p className="mt-1 text-lg leading-tight">Admin</p>
+              </div>
+              <button onClick={() => setNavOpen(false)} aria-label="Close menu" className="p-1">
+                <Icon path={icons.close} className="h-5 w-5" />
+              </button>
+            </div>
+            <NavList navItems={navItems} tab={tab} onSelect={selectTab} />
+            <div className="border-t border-border p-3">
+              <a href="/" target="_blank" rel="noreferrer" className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-gold">
+                <Icon path={icons.view} className="h-[18px] w-[18px]" /> View website
+              </a>
+              <button onClick={signOut} className="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-gold">
+                <Icon path={icons.signOut} className="h-[18px] w-[18px]" /> Sign out
+              </button>
+            </div>
+          </aside>
+        </div>
+      )}
+
+      {/* Desktop sidebar */}
+      <aside className="hidden md:flex w-64 shrink-0 flex-col border-r border-border bg-background">
         <div className="border-b border-border px-6 py-6">
           <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Kimah The Realtor</p>
           <p className="mt-1 text-lg leading-tight">Admin</p>
         </div>
-        <nav className="flex-1 space-y-1 px-3 py-4">
-          {navItems.map((item) => (
-            <button
-              key={item.key}
-              onClick={() => { setTab(item.key); setError(""); setMessage(""); }}
-              className={`flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors ${
-                tab === item.key ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary"
-              }`}
-            >
-              <Icon path={item.icon} className="h-[18px] w-[18px] shrink-0" />
-              <span className="flex-1">{item.label}</span>
-              {item.count ? (
-                <span className={`px-1.5 py-0.5 text-[11px] leading-none ${tab === item.key ? "bg-primary-foreground/20" : "bg-gold/20 text-gold"}`}>
-                  {item.count}
-                </span>
-              ) : null}
-            </button>
-          ))}
-        </nav>
+        <NavList navItems={navItems} tab={tab} onSelect={selectTab} />
         <div className="border-t border-border p-3">
           <a href="/" target="_blank" rel="noreferrer" className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-gold">
             <Icon path={icons.view} className="h-[18px] w-[18px]" /> View website
@@ -134,22 +176,20 @@ function AdminDashboard() {
       </aside>
 
       {/* Main */}
-      <div className="flex-1">
-        <header className="flex items-center justify-between border-b border-border bg-background px-8 py-5">
+      <div className="flex-1 pt-14 md:pt-0">
+        <header className="hidden md:flex items-center justify-between border-b border-border bg-background px-8 py-5">
           <h1 className="text-2xl capitalize">{tab}</h1>
           <span className="text-sm text-muted-foreground">{user.email}</span>
         </header>
 
-        <main className="px-8 py-8">
+        <main className="px-4 py-6 md:px-8 md:py-8">
           {error && <div className="mb-6 border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>}
           {message && <div className="mb-6 border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-800">{message}</div>}
 
           {tab === "overview" && (
-            <Overview onNavigate={setTab} listings={listings} testimonials={testimonials} inquiries={inquiries} />
+            <Overview onNavigate={selectTab} listings={listings} inquiries={inquiries} />
           )}
           {tab === "listings" && <Listings onError={setError} onMessage={setMessage} />}
-          {tab === "testimonials" && <Testimonials onError={setError} onMessage={setMessage} />}
-          {tab === "pages" && <PageEditor onError={setError} onMessage={setMessage} />}
           {tab === "inquiries" && <Inquiries onError={setError} onMessage={setMessage} />}
         </main>
       </div>
@@ -169,10 +209,10 @@ function Login({ onSuccess }: { onSuccess: (user: AdminUser) => void }) {
     finally { setBusy(false); }
   }
   return (
-    <div className="flex min-h-screen items-center justify-center bg-secondary/30 px-6">
-      <form onSubmit={submit} className="w-full max-w-md border border-border bg-background p-8 shadow-sm">
+    <div className="flex min-h-screen items-center justify-center bg-secondary/30 px-4 sm:px-6">
+      <form onSubmit={submit} className="w-full max-w-md border border-border bg-background p-6 sm:p-8 shadow-sm">
         <p className="eyebrow">Private area</p>
-        <h1 className="mt-3 text-4xl">Admin sign in</h1>
+        <h1 className="mt-3 text-3xl sm:text-4xl">Admin sign in</h1>
         <p className="mt-3 text-sm text-muted-foreground">Use the owner account created on Trusthost.</p>
         {error && <p className="mt-5 border border-red-300 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
         <label className="mt-7 block text-xs uppercase tracking-[0.2em]">Email
@@ -182,7 +222,7 @@ function Login({ onSuccess }: { onSuccess: (user: AdminUser) => void }) {
           <input className={`${inputClass} mt-2`} type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
         </label>
         <button disabled={busy} className="mt-7 w-full bg-primary px-5 py-3 text-xs uppercase tracking-[0.2em] text-primary-foreground disabled:opacity-50">
-          {busy ? "Signing in…" : "Sign in"}
+          {busy ? "Signing in..." : "Sign in"}
         </button>
       </form>
     </div>
@@ -191,36 +231,33 @@ function Login({ onSuccess }: { onSuccess: (user: AdminUser) => void }) {
 
 function StatTile({ label, value, onClick }: { label: string; value: number | string; onClick?: () => void }) {
   return (
-    <button onClick={onClick} disabled={!onClick} className="border border-border bg-background p-6 text-left transition-colors hover:border-gold disabled:hover:border-border">
+    <button onClick={onClick} disabled={!onClick} className="border border-border bg-background p-5 sm:p-6 text-left transition-colors hover:border-gold disabled:hover:border-border">
       <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
-      <p className="mt-3 text-4xl">{value}</p>
+      <p className="mt-3 text-3xl sm:text-4xl">{value}</p>
     </button>
   );
 }
 
 function Overview({
-  onNavigate, listings, testimonials, inquiries,
+  onNavigate, listings, inquiries,
 }: {
   onNavigate: (tab: Tab) => void;
   listings: Listing[];
-  testimonials: Testimonial[];
   inquiries: Inquiry[];
 }) {
   const activeListings = listings.filter((l) => l.status !== "draft").length;
-  const pendingTestimonials = testimonials.filter((t) => t.status === "pending").length;
   const newInquiries = inquiries.filter((i) => i.status === "new").length;
 
   return (
     <section>
-      <h2 className="text-4xl">Manage your website content.</h2>
-      <div className="mt-8 grid gap-5 md:grid-cols-3">
+      <h2 className="text-3xl sm:text-4xl">Manage your website content.</h2>
+      <div className="mt-8 grid gap-5 sm:grid-cols-2">
         <StatTile label="Active listings" value={activeListings} onClick={() => onNavigate("listings")} />
-        <StatTile label="Testimonials awaiting review" value={pendingTestimonials} onClick={() => onNavigate("testimonials")} />
         <StatTile label="New inquiries" value={newInquiries} onClick={() => onNavigate("inquiries")} />
       </div>
 
       <div className="mt-10 grid gap-6 lg:grid-cols-2">
-        <div className="border border-border bg-background p-6">
+        <div className="border border-border bg-background p-5 sm:p-6">
           <div className="flex items-center justify-between">
             <h3 className="text-xl">Recent inquiries</h3>
             <button onClick={() => onNavigate("inquiries")} className="text-xs uppercase tracking-[0.15em] text-gold">View all</button>
@@ -236,7 +273,7 @@ function Overview({
           </div>
         </div>
 
-        <div className="border border-border bg-background p-6">
+        <div className="border border-border bg-background p-5 sm:p-6">
           <div className="flex items-center justify-between">
             <h3 className="text-xl">Latest listings</h3>
             <button onClick={() => onNavigate("listings")} className="text-xs uppercase tracking-[0.15em] text-gold">View all</button>
@@ -264,12 +301,12 @@ function Inquiries({ onError, onMessage }: { onError: (s: string) => void; onMes
   async function changeStatus(id: number, status: Inquiry["status"]) { try { await updateInquiry(id, { status }); onMessage("Inquiry status updated."); await load(); } catch (e) { onError(e instanceof Error ? e.message : "Unable to update inquiry"); } }
   return (
     <section>
-      <p className="mb-6 max-w-2xl text-sm text-muted-foreground">Messages submitted through the public contact form appear here.</p>
+      <p className="mb-6 max-w-2xl text-sm text-muted-foreground">Messages submitted through the public contact form and listing pages appear here.</p>
       <div className="space-y-5">
-        {loading ? <p className="text-sm text-muted-foreground">Loading…</p> : items.length === 0 ? (
+        {loading ? <p className="text-sm text-muted-foreground">Loading...</p> : items.length === 0 ? (
           <div className="border border-border bg-background p-6 text-sm text-muted-foreground">No inquiries yet.</div>
         ) : items.map((item) => (
-          <article key={item.id} className="border border-border bg-background p-6">
+          <article key={item.id} className="border border-border bg-background p-5 sm:p-6">
             <div className="flex flex-wrap justify-between gap-4">
               <div>
                 <h3 className="text-xl">{item.name}</h3>
@@ -283,58 +320,11 @@ function Inquiries({ onError, onMessage }: { onError: (s: string) => void; onMes
                 <option value="spam">Spam</option>
               </select>
             </div>
-            <p className="mt-4 text-xs uppercase tracking-[0.15em] text-muted-foreground">{item.interest} · {new Date(item.created_at).toLocaleString()}</p>
+            <p className="mt-4 text-xs uppercase tracking-[0.15em] text-muted-foreground">{item.interest} - {new Date(item.created_at).toLocaleString()}</p>
             <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{item.message}</p>
           </article>
         ))}
       </div>
-    </section>
-  );
-}
-
-function PageEditor({ onError, onMessage }: { onError: (s: string) => void; onMessage: (s: string) => void }) {
-  const [pageKey, setPageKey] = useState("home");
-  const [sectionKey, setSectionKey] = useState("hero");
-  const [content, setContent] = useState('{\n  "headline": "",\n  "body": ""\n}');
-  const [loading, setLoading] = useState(false);
-
-  async function load() {
-    setLoading(true);
-    try {
-      const result = await getAdminPage(pageKey);
-      const section = result.data.find((item) => item.section_key === sectionKey);
-      setContent(section ? JSON.stringify(JSON.parse(section.content_json), null, 2) : '{\n  "headline": "",\n  "body": ""\n}');
-    } catch (err) { onError(err instanceof Error ? err.message : "Unable to load page content"); } finally { setLoading(false); }
-  }
-  useEffect(() => { load(); }, [pageKey, sectionKey]);
-  async function save(e: FormEvent) {
-    e.preventDefault();
-    try { await saveAdminPage(pageKey, sectionKey, JSON.parse(content)); onMessage("Page content saved."); }
-    catch (err) { onError(err instanceof Error ? err.message : "Content must be valid JSON"); }
-  }
-  return (
-    <section>
-      <p className="max-w-2xl text-sm text-muted-foreground">
-        Edit structured content stored in MySQL. The homepage currently reads the <code>home / hero</code> section and falls back to the existing copy when it is empty.
-      </p>
-      <form onSubmit={save} className="mt-8 max-w-3xl border border-border bg-background p-6">
-        <div className="grid gap-4 md:grid-cols-2">
-          <label className="text-xs uppercase tracking-[0.15em]">Page
-            <select className={`${inputClass} mt-2`} value={pageKey} onChange={(e) => setPageKey(e.target.value)}>
-              <option value="home">Home</option>
-              <option value="about">About</option>
-              <option value="contact">Contact</option>
-            </select>
-          </label>
-          <label className="text-xs uppercase tracking-[0.15em]">Section key
-            <input className={`${inputClass} mt-2`} value={sectionKey} onChange={(e) => setSectionKey(e.target.value)} />
-          </label>
-        </div>
-        <label className="mt-5 block text-xs uppercase tracking-[0.15em]">Content JSON
-          <textarea className={`${inputClass} mt-2 min-h-64 font-mono text-xs`} value={content} onChange={(e) => setContent(e.target.value)} disabled={loading} />
-        </label>
-        <button className="mt-5 bg-gold px-5 py-3 text-xs uppercase tracking-[0.2em]">Save page content</button>
-      </form>
     </section>
   );
 }
@@ -389,9 +379,9 @@ function Listings({ onError, onMessage }: { onError: (s: string) => void; onMess
       </div>
 
       {loading ? (
-        <p className="mt-8 text-sm text-muted-foreground">Loading…</p>
+        <p className="mt-8 text-sm text-muted-foreground">Loading...</p>
       ) : items.length === 0 ? (
-        <div className="mt-8 border border-dashed border-border bg-background p-12 text-center">
+        <div className="mt-8 border border-dashed border-border bg-background p-8 sm:p-12 text-center">
           <p className="text-sm text-muted-foreground">No listings yet.</p>
           <button onClick={openNew} className="mt-4 bg-gold px-5 py-2.5 text-xs uppercase tracking-[0.2em]">Create your first listing</button>
         </div>
@@ -407,4 +397,288 @@ function Listings({ onError, onMessage }: { onError: (s: string) => void; onMess
                 {item.image_url ? (
                   <img src={item.image_url} alt="" className="h-full w-full object-cover" />
                 ) : (
-                  <div className="flex h-full w-full items-center justif
+                  <div className="flex h-full w-full items-center justify-center text-xs uppercase tracking-[0.15em] text-muted-foreground">No photo</div>
+                )}
+                <span className={`absolute left-3 top-3 px-2 py-1 text-[10px] uppercase tracking-[0.1em] ${statusStyles[item.status] || "bg-secondary text-muted-foreground"}`}>
+                  {item.status.replaceAll("_", " ")}
+                </span>
+                {!!item.is_featured && (
+                  <span className="absolute right-3 top-3 bg-black/70 px-2 py-1 text-[10px] uppercase tracking-[0.1em] text-white">Featured</span>
+                )}
+                {!item.published_at && (
+                  <span className="absolute bottom-3 left-3 bg-black/70 px-2 py-1 text-[10px] uppercase tracking-[0.1em] text-white">Unpublished</span>
+                )}
+              </div>
+              <div className="p-5">
+                <h3 className="text-lg leading-snug">{item.title}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">{item.city}, {item.state}</p>
+                <p className="mt-3 text-sm">{item.price_label || "Price on request"}</p>
+                <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
+                  <span className="text-xs uppercase tracking-[0.15em] text-gold opacity-0 transition-opacity group-hover:opacity-100">Edit -&gt;</span>
+                  <button onClick={(e) => remove(item.id, e)} className="text-xs uppercase tracking-[0.15em] text-red-700">Delete</button>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+
+      {modalOpen && (
+        <ListingModal
+          listingId={editing}
+          initial={editing ? items.find((i) => i.id === editing) ?? null : null}
+          onClose={closeModal}
+          onSaved={afterSave}
+          onError={onError}
+          onMessage={onMessage}
+        />
+      )}
+    </section>
+  );
+}
+
+function ListingModal({
+  listingId, initial, onClose, onSaved, onError, onMessage,
+}: {
+  listingId: number | null;
+  initial: Listing | null;
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+  onError: (s: string) => void;
+  onMessage: (s: string) => void;
+}) {
+  const [form, setForm] = useState<Partial<Listing>>(
+    initial ? { ...initial, published: !!initial.published_at } : emptyListingForm
+  );
+  const [currentId, setCurrentId] = useState<number | null>(listingId);
+  const [slugTouched, setSlugTouched] = useState(!!listingId);
+  const [saving, setSaving] = useState(false);
+
+  function change(key: string, value: string) {
+    setForm((old) => {
+      const next: Record<string, unknown> = { ...old, [key]: value };
+      if (key === "title" && !currentId && !slugTouched) {
+        next.slug = slugify(value);
+      }
+      return next as Partial<Listing>;
+    });
+    if (key === "slug") setSlugTouched(true);
+  }
+
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      if (currentId) {
+        await updateListing(currentId, form);
+        onMessage("Listing updated.");
+        await onSaved();
+      } else {
+        const created = await createListing(form);
+        onMessage("Listing created. Add photos below.");
+        setCurrentId((created as { id: number }).id);
+        await onSaved();
+      }
+    } catch (err) { onError(err instanceof Error ? err.message : "Unable to save listing"); }
+    finally { setSaving(false); }
+  }
+
+  function handleOverlayClick(e: React.MouseEvent) {
+    if (e.target === e.currentTarget) onClose();
+  }
+
+  return (
+    <div onClick={handleOverlayClick} className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 px-4 py-8 sm:items-center">
+      <div className="w-full max-w-2xl border border-border bg-background">
+        <div className="flex items-center justify-between border-b border-border px-4 sm:px-6 py-5">
+          <h2 className="text-xl">{currentId ? "Edit listing" : "New listing"}</h2>
+          <button onClick={onClose} aria-label="Close" className="text-2xl leading-none text-muted-foreground hover:text-gold">x</button>
+        </div>
+
+        <div className="max-h-[75vh] overflow-y-auto px-4 sm:px-6 py-6">
+          <form onSubmit={save} className="grid gap-4 sm:grid-cols-2">
+            <label className="text-xs uppercase tracking-[0.15em]">Title
+              <input className={`${inputClass} mt-2`} value={form.title || ""} onChange={(e) => change("title", e.target.value)} required />
+            </label>
+            <label className="text-xs uppercase tracking-[0.15em]">Slug
+              <input
+                className={`${inputClass} mt-2 ${currentId ? "text-muted-foreground" : ""}`}
+                value={form.slug || ""}
+                onChange={(e) => change("slug", slugify(e.target.value))}
+                placeholder="generated from title"
+                required
+                disabled={!!currentId}
+              />
+              <span className="mt-1 block text-[11px] normal-case tracking-normal text-muted-foreground">
+                {currentId ? "Locked after creation." : "Auto-filled from the title - edit if you want a different URL."}
+              </span>
+            </label>
+            <label className="text-xs uppercase tracking-[0.15em]">City
+              <input className={`${inputClass} mt-2`} value={form.city || ""} onChange={(e) => change("city", e.target.value)} required />
+            </label>
+            <label className="text-xs uppercase tracking-[0.15em]">Address
+              <input className={`${inputClass} mt-2`} value={form.address || ""} onChange={(e) => change("address", e.target.value)} />
+            </label>
+            <label className="text-xs uppercase tracking-[0.15em]">Status
+              <select className={`${inputClass} mt-2`} value={form.status || "draft"} onChange={(e) => change("status", e.target.value)}>
+                <option value="draft">Draft</option>
+                <option value="for_sale">For sale</option>
+                <option value="for_lease">For lease</option>
+                <option value="investment">Investment</option>
+              </select>
+            </label>
+            <label className="text-xs uppercase tracking-[0.15em]">Price label
+              <input className={`${inputClass} mt-2`} placeholder="$450,000" value={form.price_label || ""} onChange={(e) => change("price_label", e.target.value)} />
+            </label>
+            <label className="text-xs uppercase tracking-[0.15em]">Price (numeric)
+              <input type="number" min="0" step="1000" className={`${inputClass} mt-2`} placeholder="450000" value={form.price ?? ""} onChange={(e) => change("price", e.target.value)} />
+              <span className="mt-1 block text-[11px] normal-case tracking-normal text-muted-foreground">Used for sorting/filtering. The price label above is what visitors see.</span>
+            </label>
+            <label className="text-xs uppercase tracking-[0.15em]">Bedrooms
+              <input type="number" min="0" step="1" className={`${inputClass} mt-2`} value={form.bedrooms ?? ""} onChange={(e) => change("bedrooms", e.target.value)} />
+            </label>
+            <label className="text-xs uppercase tracking-[0.15em]">Bathrooms
+              <input type="number" min="0" step="0.5" className={`${inputClass} mt-2`} value={form.bathrooms ?? ""} onChange={(e) => change("bathrooms", e.target.value)} />
+            </label>
+            <label className="text-xs uppercase tracking-[0.15em]">Square feet
+              <input type="number" min="0" step="1" className={`${inputClass} mt-2`} value={form.square_feet ?? ""} onChange={(e) => change("square_feet", e.target.value)} />
+            </label>
+            <label className="flex items-center gap-2 text-xs uppercase tracking-[0.15em]">
+              <input type="checkbox" checked={!!form.is_featured} onChange={(e) => setForm((old) => ({ ...old, is_featured: e.target.checked ? 1 : 0 }))} />
+              Featured listing
+            </label>
+            <label className="flex items-center gap-2 text-xs uppercase tracking-[0.15em] text-gold">
+              <input
+                type="checkbox"
+                checked={!!form.published}
+                onChange={(e) => setForm((old) => ({ ...old, published: e.target.checked }))}
+              />
+              Publish to website
+            </label>
+            <label className="text-xs uppercase tracking-[0.15em] sm:col-span-2">Description
+              <textarea className={`${inputClass} mt-2 min-h-24`} value={form.description || ""} onChange={(e) => change("description", e.target.value)} />
+            </label>
+            <div className="sm:col-span-2">
+              <button disabled={saving} className="w-full sm:w-auto bg-gold px-5 py-3 text-xs uppercase tracking-[0.2em] disabled:opacity-50">
+                {saving ? "Saving..." : currentId ? "Update listing" : "Create listing"}
+              </button>
+            </div>
+          </form>
+
+          {currentId && (
+            <div className="mt-6">
+              <ImageManager listingId={currentId} onError={onError} />
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-end border-t border-border px-4 sm:px-6 py-4">
+          <button onClick={onClose} className="border border-border px-5 py-2.5 text-xs uppercase tracking-[0.2em]">
+            {currentId ? "Done" : "Close"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ImageManager({ listingId, onError }: { listingId: number; onError: (s: string) => void }) {
+  const [images, setImages] = useState<ListingImage[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  async function load() {
+    try { setImages((await getListingImages(listingId)).data); }
+    catch (e) { onError(e instanceof Error ? e.message : "Unable to load images"); }
+  }
+  useEffect(() => { load(); }, [listingId]);
+
+  async function handleFiles(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    try {
+      for (const file of Array.from(files)) {
+        await uploadListingImage(listingId, file);
+      }
+      await load();
+    } catch (e) { onError(e instanceof Error ? e.message : "Unable to upload image"); }
+    finally { setUploading(false); }
+  }
+
+  async function remove(imageId: number) {
+    try { await deleteListingImage(imageId); setImages((prev) => prev.filter((img) => img.id !== imageId)); }
+    catch (e) { onError(e instanceof Error ? e.message : "Unable to delete image"); }
+  }
+
+  function onDragStart(id: number) {
+    return (e: React.DragEvent) => e.dataTransfer.setData("text/plain", String(id));
+  }
+  async function onDrop(targetId: number) {
+    return async (e: React.DragEvent) => {
+      e.preventDefault();
+      const draggedId = Number(e.dataTransfer.getData("text/plain"));
+      if (draggedId === targetId) return;
+      const current = [...images];
+      const fromIndex = current.findIndex((i) => i.id === draggedId);
+      const toIndex = current.findIndex((i) => i.id === targetId);
+      if (fromIndex === -1 || toIndex === -1) return;
+      const [moved] = current.splice(fromIndex, 1);
+      current.splice(toIndex, 0, moved);
+      setImages(current);
+      try { await reorderListingImages(listingId, current.map((i) => i.id)); }
+      catch (e) { onError(e instanceof Error ? e.message : "Unable to reorder images"); }
+    };
+  }
+
+  return (
+    <div className="border border-border bg-background p-5 sm:p-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg">Photos</h3>
+        <span className="text-xs text-muted-foreground hidden sm:inline">Drag to reorder - first photo is the cover image</span>
+      </div>
+
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
+        onClick={() => fileInput.current?.click()}
+        className={`mt-4 flex cursor-pointer flex-col items-center justify-center gap-2 border border-dashed px-6 py-8 text-center transition-colors ${
+          dragOver ? "border-gold bg-gold/5" : "border-border hover:border-gold"
+        }`}
+      >
+        <Icon path={icons.upload} className="h-6 w-6 text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">{uploading ? "Uploading..." : "Drop photos here, or click to browse"}</p>
+        <p className="text-xs text-muted-foreground">JPG, PNG, or WEBP - up to 8MB each</p>
+        <input ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={(e) => handleFiles(e.target.files)} />
+      </div>
+
+      {images.length > 0 && (
+        <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
+          {images.map((img, index) => (
+            <div
+              key={img.id}
+              draggable
+              onDragStart={onDragStart(img.id)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => onDrop(img.id).then((fn) => fn(e))}
+              className="group relative aspect-[4/3] cursor-grab border border-border bg-secondary/30"
+            >
+              <img src={img.image_url} alt="" className="h-full w-full object-cover" />
+              {index === 0 && (
+                <span className="absolute left-2 top-2 bg-gold px-2 py-1 text-[10px] uppercase tracking-[0.1em] text-black">Cover</span>
+              )}
+              <button
+                onClick={() => remove(img.id)}
+                className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center bg-black/70 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                aria-label="Delete photo"
+              >
+                <Icon path={icons.trash} className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
