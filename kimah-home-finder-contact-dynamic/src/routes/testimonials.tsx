@@ -69,7 +69,7 @@ const promises = [
   {
     icon: ShieldCheck,
     title: "Honest, always",
-    body: "Straight answers and transparent advice — even when it’s not what you expected to hear.",
+    body: "Straight answers and transparent advice  even when it’s not what you expected to hear.",
   },
   {
     icon: Clock3,
