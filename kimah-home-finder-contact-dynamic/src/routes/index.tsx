@@ -73,7 +73,7 @@ const services = [
   {
     icon: Home,
     title: "Buying",
-    body: "First-time buyers and growing families guided from pre-approval to keys in hand — with honest advice on every home we tour.",
+    body: "First-time buyers and growing families guided from pre-approval to keys in hand  with honest advice on every home we tour.",
   },
   {
     icon: TrendingUp,
@@ -83,7 +83,7 @@ const services = [
   {
     icon: KeyRound,
     title: "Leasing",
-    body: "Landlords and tenants matched with the right home and the right terms — applications, screening, and paperwork handled.",
+    body: "Landlords and tenants matched with the right home and the right terms  applications, screening, and paperwork handled.",
   },
   {
     icon: Handshake,
@@ -116,7 +116,7 @@ const steps = [
     icon: Search,
     step: "02",
     title: "Curated search",
-    body: "Hand-picked homes, buyers, or investment deals — no endless scrolling through mismatches.",
+    body: "Hand-picked homes, buyers, or investment deals  no endless scrolling through mismatches.",
   },
   {
     icon: FileSignature,
@@ -128,7 +128,7 @@ const steps = [
     icon: KeySquare,
     step: "04",
     title: "Closing & beyond",
-    body: "A smooth path to the closing table — and a Realtor who stays in your corner after it.",
+    body: "A smooth path to the closing table  and a Realtor who stays in your corner after it.",
   },
 ];
 
@@ -504,7 +504,7 @@ function Index() {
 
             <p className="mt-5 text-sm leading-relaxed text-muted-foreground">
               From city condos to family suburbs and investment corridors, I
-              know the neighborhoods, the schools, and the numbers — and I’ll
+              know the neighborhoods, the schools, and the numbers  and I’ll
               help you find your fit.
             </p>
           </div>
@@ -542,7 +542,7 @@ function Index() {
 
             <p className="mt-5 text-sm leading-relaxed text-muted-foreground">
               Whether you’re searching for your dream home, selling for top
-              dollar, hunting an investment property, or leasing — I’ll make
+              dollar, hunting an investment property, or leasing  I’ll make
               the process seamless and stress-free.
             </p>
 
