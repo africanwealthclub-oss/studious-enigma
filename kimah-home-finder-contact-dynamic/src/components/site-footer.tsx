@@ -10,7 +10,7 @@ export function SiteFooter() {
           <img
             src={logo}
             alt="Kimah The Realtor"
-            className="h-20 w-20 object-contain"
+            className="h-38 w-28 object-contain"
             loading="lazy"
           />
 
