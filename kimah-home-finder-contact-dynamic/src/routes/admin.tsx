@@ -10,6 +10,7 @@ import {
   getCurrentUser,
   login,
   logout,
+  changeAdminPassword,
   updateListing,
   type AdminUser,
   type Listing,
@@ -22,7 +23,7 @@ import {
 
 export const Route = createFileRoute("/admin")({ component: AdminDashboard });
 
-type Tab = "overview" | "listings" | "inquiries";
+type Tab = "overview" | "listings" | "inquiries" | "account";
 
 const inputClass = "w-full border border-input bg-background px-3 py-2 text-sm outline-none focus:border-gold";
 
@@ -44,6 +45,8 @@ const icons = {
   plus: "M12 5v14M5 12h14",
   menu: "M4 6h16M4 12h16M4 18h16",
   close: "M6 6l12 12M18 6L6 18",
+  star: "M12 3l2.6 5.5 6 .8-4.4 4.2 1.1 6-5.3-2.9-5.3 2.9 1.1-6L3.4 9.3l6-.8L12 3Z",
+  lock: "M6 11V8a6 6 0 1 1 12 0v3M5 11h14v9H5v-9Zm7 4v2",
 };
 
 type NavItem = { key: Tab; label: string; icon: string; count?: number };
@@ -118,6 +121,7 @@ function AdminDashboard() {
     { key: "overview", label: "Overview", icon: icons.overview },
     { key: "listings", label: "Listings", icon: icons.listings, count: listings.length },
     { key: "inquiries", label: "Inquiries", icon: icons.inquiries, count: inquiries.filter((i) => i.status === "new").length || undefined },
+    { key: "account", label: "Account", icon: icons.lock },
   ];
 
   return (
@@ -191,6 +195,7 @@ function AdminDashboard() {
           )}
           {tab === "listings" && <Listings onError={setError} onMessage={setMessage} />}
           {tab === "inquiries" && <Inquiries onError={setError} onMessage={setMessage} />}
+          {tab === "account" && <Account user={user} onError={setError} onMessage={setMessage} />}
         </main>
       </div>
     </div>
@@ -293,39 +298,300 @@ function Overview({
   );
 }
 
+function Account({
+  user, onError, onMessage,
+}: {
+  user: AdminUser;
+  onError: (s: string) => void;
+  onMessage: (s: string) => void;
+}) {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setFormError("");
+
+    if (newPassword.length < 8) {
+      setFormError("New password must be at least 8 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setFormError("New password and confirmation don't match.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await changeAdminPassword(currentPassword, newPassword);
+      onMessage("Password updated.");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Unable to update password");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section>
+      <h2 className="text-3xl sm:text-4xl">Account</h2>
+      <p className="mt-3 max-w-xl text-sm text-muted-foreground">
+        Signed in as <span className="text-foreground">{user.email}</span>.
+      </p>
+
+      <div className="mt-8 max-w-md border border-border bg-background p-5 sm:p-6">
+        <h3 className="text-lg">Change password</h3>
+        <p className="mt-1 text-sm text-muted-foreground">
+          You'll stay signed in on this device after changing it.
+        </p>
+
+        <form onSubmit={submit} className="mt-6 space-y-4">
+          {formError && (
+            <div className="border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">{formError}</div>
+          )}
+
+          <label className="block text-xs uppercase tracking-[0.15em]">Current password
+            <input
+              type="password"
+              autoComplete="current-password"
+              className={`${inputClass} mt-2`}
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              required
+            />
+          </label>
+
+          <label className="block text-xs uppercase tracking-[0.15em]">New password
+            <input
+              type="password"
+              autoComplete="new-password"
+              className={`${inputClass} mt-2`}
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              minLength={8}
+              required
+            />
+            <span className="mt-1 block text-[11px] normal-case tracking-normal text-muted-foreground">
+              At least 8 characters.
+            </span>
+          </label>
+
+          <label className="block text-xs uppercase tracking-[0.15em]">Confirm new password
+            <input
+              type="password"
+              autoComplete="new-password"
+              className={`${inputClass} mt-2`}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              minLength={8}
+              required
+            />
+          </label>
+
+          <button disabled={saving} className="w-full bg-primary px-5 py-3 text-xs uppercase tracking-[0.2em] text-primary-foreground disabled:opacity-50">
+            {saving ? "Updating..." : "Update password"}
+          </button>
+        </form>
+      </div>
+    </section>
+  );
+}
+
+/* ---------- Inquiries + detail modal ---------- */
+
+const inquiryStatusStyles: Record<Inquiry["status"], string> = {
+  new: "bg-gold/15 text-gold",
+  contacted: "bg-primary/10 text-primary",
+  closed: "bg-secondary text-muted-foreground",
+  spam: "bg-red-100 text-red-800",
+};
+
 function Inquiries({ onError, onMessage }: { onError: (s: string) => void; onMessage: (s: string) => void }) {
   const [items, setItems] = useState<Inquiry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState<Inquiry | null>(null);
+
   async function load() { try { setItems((await getAdminInquiries()).data); } catch (e) { onError(e instanceof Error ? e.message : "Unable to load inquiries"); } finally { setLoading(false); } }
   useEffect(() => { load(); }, []);
-  async function changeStatus(id: number, status: Inquiry["status"]) { try { await updateInquiry(id, { status }); onMessage("Inquiry status updated."); await load(); } catch (e) { onError(e instanceof Error ? e.message : "Unable to update inquiry"); } }
+
+  async function quickChangeStatus(id: number, status: Inquiry["status"], e: React.SyntheticEvent) {
+    e.stopPropagation();
+    try { await updateInquiry(id, { status }); onMessage("Inquiry status updated."); await load(); }
+    catch (err) { onError(err instanceof Error ? err.message : "Unable to update inquiry"); }
+  }
+
+  async function afterSave() {
+    await load();
+  }
+
   return (
     <section>
-      <p className="mb-6 max-w-2xl text-sm text-muted-foreground">Messages submitted through the public contact form and listing pages appear here.</p>
-      <div className="space-y-5">
+      <p className="mb-6 max-w-2xl text-sm text-muted-foreground">Messages submitted through the public contact form and listing pages appear here. Open one to read the full message and keep private follow-up notes.</p>
+      <div className="space-y-4">
         {loading ? <p className="text-sm text-muted-foreground">Loading...</p> : items.length === 0 ? (
           <div className="border border-border bg-background p-6 text-sm text-muted-foreground">No inquiries yet.</div>
         ) : items.map((item) => (
-          <article key={item.id} className="border border-border bg-background p-5 sm:p-6">
-            <div className="flex flex-wrap justify-between gap-4">
+          <article
+            key={item.id}
+            onClick={() => setSelected(item)}
+            className="cursor-pointer border border-border bg-background p-5 transition-colors hover:border-gold sm:p-6"
+          >
+            <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <h3 className="text-xl">{item.name}</h3>
-                <a href={`mailto:${item.email}`} className="text-sm text-gold">{item.email}</a>
-                {item.phone && <span className="ml-3 text-sm text-muted-foreground">{item.phone}</span>}
+                <div className="flex flex-wrap items-center gap-3">
+                  <h3 className="text-lg leading-snug">{item.name}</h3>
+                  <span className={`px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] ${inquiryStatusStyles[item.status]}`}>
+                    {item.status}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs uppercase tracking-[0.15em] text-muted-foreground">
+                  {item.interest} - {new Date(item.created_at).toLocaleString()}
+                </p>
               </div>
-              <select className="border border-input bg-background px-3 py-2 text-xs uppercase tracking-[0.12em]" value={item.status} onChange={(e) => changeStatus(item.id, e.target.value as Inquiry["status"])}>
+
+              <select
+                className="border border-input bg-background px-3 py-2 text-xs uppercase tracking-[0.12em]"
+                value={item.status}
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => quickChangeStatus(item.id, e.target.value as Inquiry["status"], e)}
+              >
                 <option value="new">New</option>
                 <option value="contacted">Contacted</option>
                 <option value="closed">Closed</option>
                 <option value="spam">Spam</option>
               </select>
             </div>
-            <p className="mt-4 text-xs uppercase tracking-[0.15em] text-muted-foreground">{item.interest} - {new Date(item.created_at).toLocaleString()}</p>
-            <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{item.message}</p>
+
+            <p className="mt-4 line-clamp-2 text-sm leading-relaxed text-muted-foreground">{item.message}</p>
+
+            {item.admin_notes && (
+              <p className="mt-3 border-l-2 border-gold/60 pl-3 text-xs leading-relaxed text-muted-foreground">
+                Note: {item.admin_notes}
+              </p>
+            )}
+
+            <p className="mt-4 text-xs uppercase tracking-[0.15em] text-gold">View full inquiry -&gt;</p>
           </article>
         ))}
       </div>
+
+      {selected && (
+        <InquiryDetailModal
+          inquiry={selected}
+          onClose={() => setSelected(null)}
+          onSaved={afterSave}
+          onError={onError}
+          onMessage={onMessage}
+        />
+      )}
     </section>
+  );
+}
+
+function InquiryDetailModal({
+  inquiry, onClose, onSaved, onError, onMessage,
+}: {
+  inquiry: Inquiry;
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+  onError: (s: string) => void;
+  onMessage: (s: string) => void;
+}) {
+  const [status, setStatus] = useState<Inquiry["status"]>(inquiry.status);
+  const [notes, setNotes] = useState(inquiry.admin_notes || "");
+  const [saving, setSaving] = useState(false);
+
+  function handleOverlayClick(e: React.MouseEvent) {
+    if (e.target === e.currentTarget) onClose();
+  }
+
+  async function save() {
+    setSaving(true);
+    try {
+      await updateInquiry(inquiry.id, { status, admin_notes: notes });
+      onMessage("Inquiry updated.");
+      await onSaved();
+      onClose();
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Unable to update inquiry");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div onClick={handleOverlayClick} className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 px-4 py-8 sm:items-center">
+      <div className="w-full max-w-xl border border-border bg-background">
+        <div className="flex items-center justify-between border-b border-border px-4 sm:px-6 py-5">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Inquiry</p>
+            <h2 className="mt-1 text-xl leading-snug">{inquiry.name}</h2>
+          </div>
+          <button onClick={onClose} aria-label="Close" className="text-2xl leading-none text-muted-foreground hover:text-gold">x</button>
+        </div>
+
+        <div className="max-h-[75vh] overflow-y-auto px-4 sm:px-6 py-6">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <p className="text-xs uppercase tracking-[0.15em] text-muted-foreground">Email</p>
+              <a href={`mailto:${inquiry.email}`} className="mt-1 block text-sm text-gold">{inquiry.email}</a>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.15em] text-muted-foreground">Phone</p>
+              <p className="mt-1 text-sm">{inquiry.phone || "—"}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.15em] text-muted-foreground">Interest</p>
+              <p className="mt-1 text-sm capitalize">{inquiry.interest}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.15em] text-muted-foreground">Received</p>
+              <p className="mt-1 text-sm">{new Date(inquiry.created_at).toLocaleString()}</p>
+            </div>
+          </div>
+
+          <div className="mt-6">
+            <p className="text-xs uppercase tracking-[0.15em] text-muted-foreground">Message</p>
+            <p className="mt-2 whitespace-pre-wrap border border-border bg-secondary/30 p-4 text-sm leading-relaxed text-foreground">
+              {inquiry.message}
+            </p>
+          </div>
+
+          <label className="mt-6 block text-xs uppercase tracking-[0.15em]">
+            Status
+            <select className={`${inputClass} mt-2`} value={status} onChange={(e) => setStatus(e.target.value as Inquiry["status"])}>
+              <option value="new">New</option>
+              <option value="contacted">Contacted</option>
+              <option value="closed">Closed</option>
+              <option value="spam">Spam</option>
+            </select>
+          </label>
+
+          <label className="mt-5 block text-xs uppercase tracking-[0.15em]">
+            Private follow-up notes
+            <textarea
+              className={`${inputClass} mt-2 min-h-28`}
+              placeholder="e.g. Called on 9/2, sending comps for the Frisco listing next."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+            <span className="mt-1 block text-[11px] normal-case tracking-normal text-muted-foreground">
+              Only visible to you here in the admin dashboard - never shown to the visitor.
+            </span>
+          </label>
+
+          <button disabled={saving} onClick={save} className="mt-7 w-full bg-primary px-5 py-3 text-xs uppercase tracking-[0.2em] text-primary-foreground disabled:opacity-50">
+            {saving ? "Saving..." : "Save changes"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -585,6 +851,7 @@ function ListingModal({
 function ImageManager({ listingId, onError }: { listingId: number; onError: (s: string) => void }) {
   const [images, setImages] = useState<ListingImage[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -596,19 +863,38 @@ function ImageManager({ listingId, onError }: { listingId: number; onError: (s: 
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
+    const list = Array.from(files);
     setUploading(true);
+    setUploadProgress({ done: 0, total: list.length });
     try {
-      for (const file of Array.from(files)) {
-        await uploadListingImage(listingId, file);
+      for (let i = 0; i < list.length; i++) {
+        await uploadListingImage(listingId, list[i]);
+        setUploadProgress({ done: i + 1, total: list.length });
       }
       await load();
-    } catch (e) { onError(e instanceof Error ? e.message : "Unable to upload image"); }
-    finally { setUploading(false); }
+    } catch (e) {
+      onError(e instanceof Error ? e.message : "Unable to upload image");
+    } finally {
+      setUploading(false);
+      setUploadProgress(null);
+      if (fileInput.current) fileInput.current.value = "";
+    }
   }
 
   async function remove(imageId: number) {
     try { await deleteListingImage(imageId); setImages((prev) => prev.filter((img) => img.id !== imageId)); }
     catch (e) { onError(e instanceof Error ? e.message : "Unable to delete image"); }
+  }
+
+  async function setAsCover(imageId: number) {
+    const current = [...images];
+    const fromIndex = current.findIndex((i) => i.id === imageId);
+    if (fromIndex <= 0) return;
+    const [moved] = current.splice(fromIndex, 1);
+    current.unshift(moved);
+    setImages(current);
+    try { await reorderListingImages(listingId, current.map((i) => i.id)); }
+    catch (e) { onError(e instanceof Error ? e.message : "Unable to update cover photo"); }
   }
 
   function onDragStart(id: number) {
@@ -634,8 +920,8 @@ function ImageManager({ listingId, onError }: { listingId: number; onError: (s: 
   return (
     <div className="border border-border bg-background p-5 sm:p-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg">Photos</h3>
-        <span className="text-xs text-muted-foreground hidden sm:inline">Drag to reorder - first photo is the cover image</span>
+        <h3 className="text-lg">Photos {images.length > 0 && <span className="text-sm text-muted-foreground">({images.length})</span>}</h3>
+        <span className="text-xs text-muted-foreground hidden sm:inline">Drag, or use "Set as cover" - first photo is the cover image</span>
       </div>
 
       <div
@@ -648,7 +934,11 @@ function ImageManager({ listingId, onError }: { listingId: number; onError: (s: 
         }`}
       >
         <Icon path={icons.upload} className="h-6 w-6 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">{uploading ? "Uploading..." : "Drop photos here, or click to browse"}</p>
+        <p className="text-sm text-muted-foreground">
+          {uploading
+            ? `Uploading ${uploadProgress?.done ?? 0} of ${uploadProgress?.total ?? 0}...`
+            : "Drop photos here, or click to browse - select as many as you like at once"}
+        </p>
         <p className="text-xs text-muted-foreground">JPG, PNG, or WEBP - up to 8MB each</p>
         <input ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={(e) => handleFiles(e.target.files)} />
       </div>
@@ -668,13 +958,24 @@ function ImageManager({ listingId, onError }: { listingId: number; onError: (s: 
               {index === 0 && (
                 <span className="absolute left-2 top-2 bg-gold px-2 py-1 text-[10px] uppercase tracking-[0.1em] text-black">Cover</span>
               )}
-              <button
-                onClick={() => remove(img.id)}
-                className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center bg-black/70 text-white opacity-0 transition-opacity group-hover:opacity-100"
-                aria-label="Delete photo"
-              >
-                <Icon path={icons.trash} className="h-4 w-4" />
-              </button>
+              <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 bg-black/70 px-2 py-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+                {index !== 0 ? (
+                  <button
+                    onClick={() => setAsCover(img.id)}
+                    className="flex items-center gap-1 text-[10px] uppercase tracking-[0.08em] text-white hover:text-gold"
+                  >
+                    <Icon path={icons.star} className="h-3.5 w-3.5" />
+                    Set cover
+                  </button>
+                ) : <span />}
+                <button
+                  onClick={() => remove(img.id)}
+                  className="flex h-6 w-6 items-center justify-center text-white hover:text-red-400"
+                  aria-label="Delete photo"
+                >
+                  <Icon path={icons.trash} className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           ))}
         </div>
