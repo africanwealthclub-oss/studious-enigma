@@ -19,7 +19,7 @@ export const Route = createFileRoute("/testimonials")({
       {
         name: "description",
         content:
-          "Read client experiences with Tiffany Durojaiye and discover what clients say about their DFW buying, selling, leasing, and investment journeys.",
+          "Read client experiences with Tiffany Durojaiye and discover what clients say about their buying, selling, leasing, and investment journeys across the Dallas - Fort Worth Metroplex.",
       },
       {
         property: "og:title",
@@ -38,7 +38,29 @@ export const Route = createFileRoute("/testimonials")({
   component: Testimonials,
 });
 
-const mockTestimonials: Testimonial[] = [
+type Review = Testimonial & {
+  avatar?: string | null;
+  time?: string | null;
+  source_url?: string | null;
+  review_url?: string | null;
+};
+
+type GoogleReviewsResponse = {
+  data: Review[];
+  rating?: number | null;
+  total?: number | null;
+  maps_url?: string | null;
+  write_review_url?: string | null;
+};
+
+type GoogleSummary = {
+  rating?: number | null;
+  total?: number | null;
+  url?: string | null;
+  writeUrl?: string | null;
+};
+
+const mockTestimonials: Review[] = [
   {
     id: "mock-1",
     client_name: "Jasmine R.",
@@ -84,25 +106,64 @@ const promises = [
 ];
 
 function Testimonials() {
-  const [reviews, setReviews] = useState<Testimonial[]>(mockTestimonials);
+  const [reviews, setReviews] = useState<Review[]>(mockTestimonials);
+  const [google, setGoogle] = useState<GoogleSummary | null>(null);
+  const [fromGoogle, setFromGoogle] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    apiRequest<{ data: Testimonial[] }>("/public/testimonials")
-      .then((result) => {
-        if (result.data?.length) {
+    let cancelled = false;
+
+    async function load() {
+      // 1. Live Google reviews
+      try {
+        const result = await apiRequest<GoogleReviewsResponse>(
+          "/public/google-reviews",
+        );
+
+        if (!cancelled && result.data?.length) {
+          setReviews(result.data);
+          setFromGoogle(true);
+          setGoogle({
+            rating: result.rating,
+            total: result.total,
+            url: result.maps_url,
+            writeUrl: result.write_review_url,
+          });
+          return;
+        }
+      } catch {
+        // fall through to site testimonials
+      }
+
+      // 2. Testimonials saved in the admin
+      try {
+        const result = await apiRequest<{ data: Testimonial[] }>(
+          "/public/testimonials",
+        );
+
+        if (!cancelled && result.data?.length) {
           setReviews(result.data);
         }
-      })
-      .catch((err) => {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Unable to load testimonials",
-        );
-      })
-      .finally(() => setLoading(false));
+      } catch (err) {
+        if (!cancelled) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Unable to load testimonials",
+          );
+        }
+      }
+    }
+
+    load().finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (
@@ -119,8 +180,60 @@ function Testimonials() {
 
         <p className="mt-6 max-w-2xl text-sm leading-relaxed text-muted-foreground">
           Real experiences from buyers, sellers, investors, landlords, and
-          tenants across the Dallas–Fort Worth metroplex.
+          tenants across the Dallas - Fort Worth Metroplex.
         </p>
+
+        {google?.rating ? (
+          <div className="mt-8 flex flex-wrap items-center gap-x-4 gap-y-2">
+            <div className="flex gap-1">
+              {Array.from({ length: 5 }).map((_, s) => (
+                <Star
+                  key={s}
+                  className={`size-5 ${
+                    s < Math.round(google.rating ?? 0)
+                      ? "fill-gold text-gold"
+                      : "text-gold/40"
+                  }`}
+                />
+              ))}
+            </div>
+
+            <p className="text-sm">
+              <span className="font-display text-xl">
+                {google.rating.toFixed(1)}
+              </span>
+              {google.total ? (
+                <span className="text-muted-foreground">
+                  {" "}
+                  · {google.total} Google reviews
+                </span>
+              ) : null}
+            </p>
+
+            {google.url && (
+              <a
+                href={google.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-xs tracking-[0.22em] text-gold uppercase"
+              >
+                Read all on Google
+                <ArrowRight className="size-4" />
+              </a>
+            )}
+
+            {google.writeUrl && (
+              <a
+                href={google.writeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 border border-gold px-5 py-2.5 text-xs tracking-[0.22em] text-gold uppercase"
+              >
+                Leave a review
+              </a>
+            )}
+          </div>
+        ) : null}
       </section>
 
       {/* Reviews grid */}
@@ -157,16 +270,57 @@ function Testimonials() {
               ))}
             </div>
 
-            <figcaption className="mt-4">
-              <span className="block text-lg">{r.client_name}</span>
+            <figcaption className="mt-4 flex items-center gap-3">
+              {r.avatar && (
+                <img
+                  src={r.avatar}
+                  alt=""
+                  referrerPolicy="no-referrer"
+                  loading="lazy"
+                  className="size-10 rounded-full object-cover"
+                />
+              )}
 
-              <span className="block text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                {r.client_type || "Client"}
-                {r.city ? ` · ${r.city}` : ""}
-              </span>
+              <div>
+                {r.source_url ? (
+                  <a
+                    href={r.source_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block text-lg hover:underline"
+                  >
+                    {r.client_name}
+                  </a>
+                ) : (
+                  <span className="block text-lg">{r.client_name}</span>
+                )}
+
+                <span className="block text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                  {r.client_type || "Client"}
+                  {r.city ? ` · ${r.city}` : ""}
+                  {r.time ? ` · ${r.time}` : ""}
+                </span>
+
+                {r.review_url && (
+                  <a
+                    href={r.review_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-1 block text-[10px] tracking-[0.18em] text-gold uppercase"
+                  >
+                    View on Google
+                  </a>
+                )}
+              </div>
             </figcaption>
           </figure>
         ))}
+
+        {fromGoogle && (
+          <p className="col-span-full text-xs tracking-[0.16em] text-muted-foreground uppercase">
+            Reviews from Google
+          </p>
+        )}
       </section>
 
       {/* Service promise */}
