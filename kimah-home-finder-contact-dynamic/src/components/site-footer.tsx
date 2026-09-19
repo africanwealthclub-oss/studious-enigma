@@ -50,8 +50,8 @@ export function SiteFooter() {
 
             <li className="flex items-center gap-2">
               <Mail className="size-4" />
-              <a href="mailto:hello@kimahtherealtor.com">
-                hello@kimahtherealtor.com
+              <a href="mailto:Kimahtherealtor@gmail.com">
+                Kimahtherealtor@gmail.com
               </a>
             </li>
 
@@ -66,16 +66,7 @@ export function SiteFooter() {
               </a>
             </li>
 
-            <li className="flex items-center gap-2">
-              <LinkIcon className="size-4" />
-              <a
-                href="https://linktr.ee/Touringwithmariam"
-                target="_blank"
-                rel="noreferrer"
-              >
-                All links
-              </a>
-            </li>
+           
           </ul>
         </div>
       </div>
