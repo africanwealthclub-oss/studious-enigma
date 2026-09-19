@@ -12,6 +12,9 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { apiRequest, type Testimonial } from "@/lib/api";
 
+const ELFSIGHT_SRC = "https://elfsightcdn.com/platform.js";
+const ELFSIGHT_APP_ID = "45cf2b97-c004-4b83-a7cd-0f96c4492c0c";
+
 export const Route = createFileRoute("/testimonials")({
   head: () => ({
     meta: [
@@ -38,55 +41,6 @@ export const Route = createFileRoute("/testimonials")({
   component: Testimonials,
 });
 
-type Review = Testimonial & {
-  avatar?: string | null;
-  time?: string | null;
-  source_url?: string | null;
-  review_url?: string | null;
-};
-
-type GoogleReviewsResponse = {
-  data: Review[];
-  rating?: number | null;
-  total?: number | null;
-  maps_url?: string | null;
-  write_review_url?: string | null;
-};
-
-type GoogleSummary = {
-  rating?: number | null;
-  total?: number | null;
-  url?: string | null;
-  writeUrl?: string | null;
-};
-
-const mockTestimonials: Review[] = [
-  {
-    id: "mock-1",
-    client_name: "Jasmine R.",
-    client_type: "Home Buyer",
-    city: "Frisco",
-    body: "Tiffany made buying our first home feel so much less overwhelming. She was patient, responsive, and always explained our options clearly. We felt confident every step of the way.",
-    rating: 5,
-  },
-  {
-    id: "mock-2",
-    client_name: "Marcus & Danielle T.",
-    client_type: "Home Sellers",
-    city: "Dallas",
-    body: "From pricing our home to negotiating the final offer, Tiffany was completely in our corner. Her communication was excellent and she helped us navigate the entire process with confidence.",
-    rating: 5,
-  },
-  {
-    id: "mock-3",
-    client_name: "Andre W.",
-    client_type: "Investor",
-    city: "Fort Worth",
-    body: "Tiffany understands that an investment property has to make sense beyond the purchase price. She helped me evaluate the numbers, understand the market, and find an opportunity that fit my goals.",
-    rating: 5,
-  },
-];
-
 const promises = [
   {
     icon: ShieldCheck,
@@ -106,64 +60,31 @@ const promises = [
 ];
 
 function Testimonials() {
-  const [reviews, setReviews] = useState<Review[]>(mockTestimonials);
-  const [google, setGoogle] = useState<GoogleSummary | null>(null);
-  const [fromGoogle, setFromGoogle] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [reviews, setReviews] = useState<Testimonial[]>([]);
 
+  // Load the Elfsight Google Reviews widget (only on this page)
   useEffect(() => {
-    let cancelled = false;
+    document
+      .querySelectorAll(`script[src="${ELFSIGHT_SRC}"]`)
+      .forEach((el) => el.remove());
 
-    async function load() {
-      // 1. Live Google reviews
-      try {
-        const result = await apiRequest<GoogleReviewsResponse>(
-          "/public/google-reviews",
-        );
-
-        if (!cancelled && result.data?.length) {
-          setReviews(result.data);
-          setFromGoogle(true);
-          setGoogle({
-            rating: result.rating,
-            total: result.total,
-            url: result.maps_url,
-            writeUrl: result.write_review_url,
-          });
-          return;
-        }
-      } catch {
-        // fall through to site testimonials
-      }
-
-      // 2. Testimonials saved in the admin
-      try {
-        const result = await apiRequest<{ data: Testimonial[] }>(
-          "/public/testimonials",
-        );
-
-        if (!cancelled && result.data?.length) {
-          setReviews(result.data);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : "Unable to load testimonials",
-          );
-        }
-      }
-    }
-
-    load().finally(() => {
-      if (!cancelled) setLoading(false);
-    });
+    const script = document.createElement("script");
+    script.src = ELFSIGHT_SRC;
+    script.async = true;
+    document.body.appendChild(script);
 
     return () => {
-      cancelled = true;
+      script.remove();
     };
+  }, []);
+
+  // Testimonials saved in the admin (shown only if there are any)
+  useEffect(() => {
+    apiRequest<{ data: Testimonial[] }>("/public/testimonials")
+      .then((result) => {
+        if (result.data?.length) setReviews(result.data);
+      })
+      .catch(() => undefined);
   }, []);
 
   return (
@@ -182,146 +103,57 @@ function Testimonials() {
           Real experiences from buyers, sellers, investors, landlords, and
           tenants across the Dallas - Fort Worth Metroplex.
         </p>
-
-        {google?.rating ? (
-          <div className="mt-8 flex flex-wrap items-center gap-x-4 gap-y-2">
-            <div className="flex gap-1">
-              {Array.from({ length: 5 }).map((_, s) => (
-                <Star
-                  key={s}
-                  className={`size-5 ${
-                    s < Math.round(google.rating ?? 0)
-                      ? "fill-gold text-gold"
-                      : "text-gold/40"
-                  }`}
-                />
-              ))}
-            </div>
-
-            <p className="text-sm">
-              <span className="font-display text-xl">
-                {google.rating.toFixed(1)}
-              </span>
-              {google.total ? (
-                <span className="text-muted-foreground">
-                  {" "}
-                  · {google.total} Google reviews
-                </span>
-              ) : null}
-            </p>
-
-            {google.url && (
-              <a
-                href={google.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 text-xs tracking-[0.22em] text-gold uppercase"
-              >
-                Read all on Google
-                <ArrowRight className="size-4" />
-              </a>
-            )}
-
-            {google.writeUrl && (
-              <a
-                href={google.writeUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 border border-gold px-5 py-2.5 text-xs tracking-[0.22em] text-gold uppercase"
-              >
-                Leave a review
-              </a>
-            )}
-          </div>
-        ) : null}
       </section>
 
-      {/* Reviews grid */}
-      <section className="mx-auto grid max-w-6xl gap-8 px-6 pb-20 md:grid-cols-2 lg:grid-cols-3">
-        {loading && (
-          <p className="col-span-full text-sm text-muted-foreground">
-            Loading client experiences…
-          </p>
-        )}
+      {/* Live Google reviews */}
+      <section className="mx-auto max-w-6xl px-6 pb-20">
+        <div
+          className={`elfsight-app-${ELFSIGHT_APP_ID}`}
+          data-elfsight-app-lazy=""
+        />
+      </section>
 
-        {error && (
-          <p className="col-span-full border border-red-300 bg-red-50 p-4 text-sm text-red-800">
-            {error}
-          </p>
-        )}
+      {/* Admin testimonials (only if any exist) */}
+      {reviews.length > 0 && (
+        <section className="mx-auto max-w-6xl px-6 pb-20">
+          <p className="eyebrow">More client stories</p>
 
-        {reviews.map((r) => (
-          <figure
-            key={r.id}
-            className="flex h-full flex-col border border-border p-8"
-          >
-            <Quote className="size-6 text-gold" />
+          <span className="rule-gold mt-6" />
 
-            <blockquote className="mt-5 flex-1 text-sm leading-relaxed text-muted-foreground">
-              “{r.body}”
-            </blockquote>
+          <div className="mt-10 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+            {reviews.map((r) => (
+              <figure
+                key={r.id}
+                className="flex h-full flex-col border border-border p-8"
+              >
+                <Quote className="size-6 text-gold" />
 
-            <div className="mt-6 flex gap-1">
-              {Array.from({ length: r.rating || 5 }).map((_, s) => (
-                <Star
-                  key={s}
-                  className="size-4 fill-gold text-gold"
-                />
-              ))}
-            </div>
+                <blockquote className="mt-5 flex-1 text-sm leading-relaxed text-muted-foreground">
+                  “{r.body}”
+                </blockquote>
 
-            <figcaption className="mt-4 flex items-center gap-3">
-              {r.avatar && (
-                <img
-                  src={r.avatar}
-                  alt=""
-                  referrerPolicy="no-referrer"
-                  loading="lazy"
-                  className="size-10 rounded-full object-cover"
-                />
-              )}
+                <div className="mt-6 flex gap-1">
+                  {Array.from({ length: r.rating || 5 }).map((_, s) => (
+                    <Star
+                      key={s}
+                      className="size-4 fill-gold text-gold"
+                    />
+                  ))}
+                </div>
 
-              <div>
-                {r.source_url ? (
-                  <a
-                    href={r.source_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block text-lg hover:underline"
-                  >
-                    {r.client_name}
-                  </a>
-                ) : (
+                <figcaption className="mt-4">
                   <span className="block text-lg">{r.client_name}</span>
-                )}
 
-                <span className="block text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                  {r.client_type || "Client"}
-                  {r.city ? ` · ${r.city}` : ""}
-                  {r.time ? ` · ${r.time}` : ""}
-                </span>
-
-                {r.review_url && (
-                  <a
-                    href={r.review_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-1 block text-[10px] tracking-[0.18em] text-gold uppercase"
-                  >
-                    View on Google
-                  </a>
-                )}
-              </div>
-            </figcaption>
-          </figure>
-        ))}
-
-        {fromGoogle && (
-          <p className="col-span-full text-xs tracking-[0.16em] text-muted-foreground uppercase">
-            Reviews from Google
-          </p>
-        )}
-      </section>
+                  <span className="block text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                    {r.client_type || "Client"}
+                    {r.city ? ` · ${r.city}` : ""}
+                  </span>
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Service promise */}
       <section className="border-y border-border bg-secondary">
