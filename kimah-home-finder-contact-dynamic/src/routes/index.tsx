@@ -103,6 +103,12 @@ const areas = [
   "Grand Prairie",
   "Mansfield",
   "Denton",
+  "Forney",
+  "Celina",
+  "Prosper",
+  "Wylie",
+  "Rockwall",
+  "And Much More",
 ];
 
 const steps = [
