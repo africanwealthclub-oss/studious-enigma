@@ -12,7 +12,6 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { apiRequest, type Testimonial } from "@/lib/api";
 
-const ELFSIGHT_SRC = "https://elfsightcdn.com/platform.js";
 const ELFSIGHT_APP_ID = "45cf2b97-c004-4b83-a7cd-0f96c4492c0c";
 
 export const Route = createFileRoute("/testimonials")({
@@ -37,6 +36,7 @@ export const Route = createFileRoute("/testimonials")({
       { property: "og:url", content: "/testimonials" },
     ],
     links: [{ rel: "canonical", href: "/testimonials" }],
+    scripts: [{ src: "https://elfsightcdn.com/platform.js", async: true }],
   }),
   component: Testimonials,
 });
@@ -61,22 +61,6 @@ const promises = [
 
 function Testimonials() {
   const [reviews, setReviews] = useState<Testimonial[]>([]);
-
-  // Load the Elfsight Google Reviews widget (only on this page)
-  useEffect(() => {
-    document
-      .querySelectorAll(`script[src="${ELFSIGHT_SRC}"]`)
-      .forEach((el) => el.remove());
-
-    const script = document.createElement("script");
-    script.src = ELFSIGHT_SRC;
-    script.async = true;
-    document.body.appendChild(script);
-
-    return () => {
-      script.remove();
-    };
-  }, []);
 
   // Testimonials saved in the admin (shown only if there are any)
   useEffect(() => {
