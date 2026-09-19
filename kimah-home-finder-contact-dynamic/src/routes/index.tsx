@@ -33,21 +33,22 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       {
-        title: "Kimah The Realtor | DFW Real Estate with Tiffany Durojaiye",
+        title:
+          "Kimah The Realtor | Dallas - Fort Worth Metroplex Real Estate with Tiffany Durojaiye",
       },
       {
         name: "description",
         content:
-          "Buy, sell, lease, or invest in Dallas–Fort Worth with Tiffany Durojaiye, a Texas Realtor known for honest guidance and skilled negotiation.",
+          "Buy, sell, lease, or invest in the Dallas - Fort Worth Metroplex with Tiffany Durojaiye, a Texas Realtor known for honest guidance and skilled negotiation.",
       },
       {
         property: "og:title",
-        content: "Kimah The Realtor | DFW Real Estate",
+        content: "Kimah The Realtor | Dallas - Fort Worth Metroplex Real Estate",
       },
       {
         property: "og:description",
         content:
-          "Texas Realtor Tiffany Durojaiye helps buyers, sellers, investors, and tenants across DFW.",
+          "Texas Realtor Tiffany Durojaiye helps buyers, sellers, investors, and tenants across the Dallas - Fort Worth Metroplex.",
       },
       {
         property: "og:type",
@@ -88,7 +89,7 @@ const services = [
   {
     icon: Handshake,
     title: "Investing",
-    body: "Cash-flow and appreciation plays across the DFW metroplex and beyond, analyzed with real numbers before you commit.",
+    body: "Cash-flow and appreciation plays across the Dallas - Fort Worth Metroplex and beyond, analyzed with real numbers before you commit.",
   },
 ];
 
@@ -108,7 +109,7 @@ const areas = [
   "Prosper",
   "Wylie",
   "Rockwall",
-  "And Much More",
+  "And much more",
 ];
 
 const steps = [
@@ -183,7 +184,7 @@ function Index() {
         {/* Desktop portrait */}
         <img
           src={portraitHero}
-          alt="Tiffany Durojaiye, Texas Realtor serving Dallas–Fort Worth"
+          alt="Tiffany Durojaiye, Texas Realtor serving the Dallas - Fort Worth Metroplex"
           className="absolute right-0 top-0 hidden h-full w-[62%] object-cover object-[80%_20%] md:block"
         />
 
@@ -201,7 +202,7 @@ function Index() {
           <div className="relative h-[58vh] min-h-[430px] max-h-[600px] overflow-hidden">
             <img
               src={portraitHero}
-              alt="Tiffany Durojaiye, Texas Realtor serving Dallas–Fort Worth"
+              alt="Tiffany Durojaiye, Texas Realtor serving the Dallas - Fort Worth Metroplex"
               className="h-full w-full object-cover object-top"
             />
 
@@ -218,7 +219,7 @@ function Index() {
         {/* Hero content */}
         <div className="relative mx-auto w-full max-w-6xl px-5 py-14 sm:px-6 sm:py-20 md:flex md:min-h-[85vh] md:items-center md:py-24">
           <div className="max-w-xl text-white">
-            <p className="eyebrow">Dallas–Fort Worth · Texas</p>
+            <p className="eyebrow">Dallas - Fort Worth Metroplex · Texas</p>
 
             <h1 className="mt-4 font-display text-4xl leading-[1.05] sm:mt-5 sm:text-5xl md:text-6xl lg:text-7xl">
               {hero.headline ||
@@ -260,7 +261,7 @@ function Index() {
 
               <div>
                 <p className="font-display text-lg sm:text-xl">
-                  DFW Metroplex
+                  Dallas - Fort Worth Metroplex
                 </p>
                 <p className="mt-1 text-[10px] tracking-[0.16em] text-white/60 uppercase sm:text-xs">
                   & surrounding communities
@@ -313,7 +314,8 @@ function Index() {
               <p className="eyebrow">Featured properties</p>
 
               <h2 className="mt-4 max-w-2xl text-3xl sm:text-4xl">
-                A look at what’s available across DFW.
+                A look at what’s available across the Dallas - Fort Worth
+                Metroplex.
               </h2>
 
               <span className="rule-gold mt-6" />
@@ -505,7 +507,7 @@ function Index() {
             <p className="eyebrow">Where I work</p>
 
             <h2 className="mt-4 text-3xl sm:text-4xl">
-              Proudly serving the DFW metroplex.
+              Proudly serving the Dallas - Fort Worth Metroplex.
             </h2>
 
             <p className="mt-5 text-sm leading-relaxed text-muted-foreground">
@@ -516,15 +518,23 @@ function Index() {
           </div>
 
           <ul className="flex flex-wrap gap-3">
-            {areas.map((a) => (
-              <li
-                key={a}
-                className="flex items-center gap-2 border border-border bg-background px-4 py-3 text-xs tracking-[0.18em] uppercase sm:px-5"
-              >
-                <MapPin className="size-3.5 text-gold" />
-                {a}
-              </li>
-            ))}
+            {areas.map((a) => {
+              const isMore = a === "And much more";
+
+              return (
+                <li
+                  key={a}
+                  className={`flex items-center gap-2 border px-4 py-3 text-xs tracking-[0.18em] uppercase sm:px-5 ${
+                    isMore
+                      ? "border-gold bg-background text-gold"
+                      : "border-border bg-background"
+                  }`}
+                >
+                  {!isMore && <MapPin className="size-3.5 text-gold" />}
+                  {a}
+                </li>
+              );
+            })}
           </ul>
         </div>
       </section>
