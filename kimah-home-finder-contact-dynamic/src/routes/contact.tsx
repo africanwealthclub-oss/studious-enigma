@@ -43,8 +43,8 @@ const channels = [
   {
     icon: Mail,
     label: "Email",
-    value: "hello@kimahtherealtor.com",
-    href: "mailto:hello@kimahtherealtor.com",
+    value: "Kimahtherealtor@gmail.com",
+    href: "mailto:Kimahtherealtor@gmail.com",
   },
   {
     icon: Instagram,
@@ -52,12 +52,7 @@ const channels = [
     value: "@kimahtherealtor",
     href: "https://www.instagram.com/kimahtherealtor",
   },
-  {
-    icon: LinkIcon,
-    label: "All links",
-    value: "linktr.ee/Touringwithmariam",
-    href: "https://linktr.ee/Touringwithmariam",
-  },
+ 
 ];
 
 function Contact() {
